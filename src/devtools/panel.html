@@ -9,87 +9,84 @@
   <body>
     <header class="toolbar">
       <strong>TestX</strong>
-      <button id="themeToggle" type="button" aria-label="Switch to dark mode" title="Switch to dark mode">
-        <span id="themeIcon" aria-hidden="true">&#128161;</span>
+      <button id="devRefreshBtn" type="button" title="Reload inspected page and extension">
+        Dev Refresh
       </button>
     </header>
+
     <main class="layout">
-      <aside class="sidebar">
-        <section class="panel-card">
-          <h3>New Group</h3>
-          <div class="inline">
-            <input id="groupNameInput" type="text" placeholder="Group name" />
-            <button id="addGroupBtn" type="button">Add</button>
-          </div>
-        </section>
-
-        <section class="panel-card">
-          <h3>New Route</h3>
-          <div class="stack">
-            <input id="routeNameInput" type="text" placeholder="Route name" />
-            <select id="routeMethodInput">
-              <option>GET</option>
-              <option>POST</option>
-              <option>PUT</option>
-              <option>PATCH</option>
-              <option>DELETE</option>
-              <option>HEAD</option>
-              <option>OPTIONS</option>
-            </select>
-            <input id="routeUrlInput" type="url" placeholder="https://api.example.com/items" />
-            <select id="routeGroupSelect"></select>
-            <button id="addRouteBtn" type="button">Add Route</button>
-          </div>
-        </section>
-
-        <section class="panel-card">
-          <h3>Import Swagger/OpenAPI</h3>
-          <div class="stack">
-            <input id="swaggerUrlInput" type="url" placeholder="https://api.example.com/openapi.json" />
-            <button id="importSwaggerUrlBtn" type="button">Import from URL</button>
-            <textarea id="swaggerSpecInput" rows="6" placeholder="Paste OpenAPI/Swagger JSON or YAML"></textarea>
-            <button id="importSwaggerTextBtn" type="button">Import from Text</button>
-            <div id="importStatus" class="helper-text"></div>
-          </div>
-        </section>
-
-        <section class="panel-card">
-          <h3>AI Automations</h3>
-          <div class="stack">
-            <input id="aiEndpointInput" type="url" placeholder="LLM endpoint (OpenAI-compatible)" />
-            <input id="aiModelInput" type="text" placeholder="Model (e.g. gpt-4o-mini)" />
-            <input id="aiApiKeyInput" type="password" placeholder="LLM API key" />
-            <textarea id="aiPromptInput" rows="4" placeholder="Describe the workflow to automate"></textarea>
-            <div class="inline">
-              <button id="saveAiSettingsBtn" type="button">Save AI Settings</button>
-              <button id="planAiWorkflowBtn" type="button">Generate Workflow</button>
-            </div>
-            <button id="runAiWorkflowBtn" type="button">Run Workflow</button>
-            <div id="aiStatus" class="helper-text"></div>
-            <pre id="aiWorkflowPreview" class="compact-pre"></pre>
-          </div>
-        </section>
-
-        <section class="panel-card tree-wrap">
-          <h3>Routes</h3>
-          <div id="routeTree" class="route-tree"></div>
-        </section>
+      <aside class="nav-panel">
+        <div class="nav-title">Navigation</div>
+        <button class="nav-item nav-parent is-expanded" type="button" id="siteSetupMenuToggle">
+          Site Setup
+        </button>
+        <div class="nav-submenu" id="siteSetupSubmenu">
+          <button class="nav-subitem is-active" type="button" data-page="test-endpoints">
+            Test Endpoints
+          </button>
+          <button class="nav-subitem" type="button" data-page="manage-endpoints">
+            Manage Endpoints
+          </button>
+        </div>
+        <button class="nav-item" type="button" data-page="routes">Routes</button>
+        <button class="nav-item" type="button" data-page="swagger">Swagger Import</button>
+        <button class="nav-item" type="button" data-page="ai-workflow">AI Workflow</button>
+        <button class="nav-item" type="button" data-page="settings">Settings</button>
       </aside>
 
       <section class="workspace">
-        <div id="emptyState" class="empty-state">Select a route from sidebar to start testing.</div>
-        <div id="tester" class="tester hidden">
-          <div class="workspace-head">
-            <input id="selectedRouteName" type="text" />
-            <div class="inline">
-              <button id="saveRouteBtn" type="button">Save</button>
-              <button id="deleteRouteBtn" type="button">Delete</button>
+        <section class="page is-active" data-page="site-setup">
+          <section class="panel-card page-card">
+            <h3>Initial Setup</h3>
+            <div class="stack">
+              <input id="siteBaseUrlInput" type="url" placeholder="https://example.com" />
+              <div class="helper-text">Only base URL is used (origin without subpath).</div>
+              <label>
+                Max pages to crawl
+                <input id="siteMaxPagesInput" type="number" min="1" max="30" step="1" value="6" />
+              </label>
+              <button id="startSiteTestingBtn" type="button">Start Testing (AI Discover Endpoints)</button>
+              <div id="siteStatus" class="helper-text"></div>
+              <hr />
+              <h4>Credential-Assisted Discovery</h4>
+              <select id="authModeSelect">
+                <option value="signin">Sign In</option>
+                <option value="signup">Sign Up</option>
+              </select>
+              <input id="authEmailInput" type="text" placeholder="Email (optional)" />
+              <input id="authUsernameInput" type="text" placeholder="Username (optional)" />
+              <input id="authPasswordInput" type="password" placeholder="Password" />
+              <input id="authConfirmPasswordInput" type="password" placeholder="Confirm password (for sign up)" />
+              <label class="check-row">
+                <input id="authRequiresManualStepInput" type="checkbox" />
+                <span>OTP/manual verification required (I will complete it manually)</span>
+              </label>
+              <button id="runAuthDiscoveryBtn" type="button">Run Auth Flow + Discover</button>
+              <div class="inline">
+                <button id="continueAuthDiscoveryBtn" type="button" disabled>Continue Discovery After OTP</button>
+                <button id="cancelAuthSessionBtn" type="button" disabled>Cancel Auth Session</button>
+              </div>
+              <div id="authStatus" class="helper-text"></div>
             </div>
-          </div>
-          <div class="grid">
-            <label>
-              Method
-              <select id="selectedRouteMethod">
+          </section>
+        </section>
+
+        <section class="page" data-page="test-endpoints">
+          <section class="panel-card page-card">
+            <h3>Test Endpoints</h3>
+            <div class="stack">
+              <button id="addDiscoveredRoutesBtn" type="button">Add Discovered Endpoints To Routes</button>
+              <div id="testEndpointsList" class="endpoint-list"></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="page" data-page="manage-endpoints">
+          <section class="panel-card page-card">
+            <h3>Manage Endpoints</h3>
+            <div class="stack">
+              <input id="manageEndpointUrlInput" type="url" placeholder="https://api.example.com/v1/items" />
+              <select id="manageEndpointMethodInput">
                 <option>GET</option>
                 <option>POST</option>
                 <option>PUT</option>
@@ -98,37 +95,196 @@
                 <option>HEAD</option>
                 <option>OPTIONS</option>
               </select>
-            </label>
-            <label>
-              Group
-              <select id="selectedRouteGroup"></select>
-            </label>
+              <input id="manageEndpointGroupInput" type="text" placeholder="Group (e.g. Authentication)" />
+              <input id="manageEndpointReasonInput" type="text" placeholder="Reason / notes (optional)" />
+              <div class="inline">
+                <button id="saveManagedEndpointBtn" type="button">Save Endpoint</button>
+                <button id="cancelManagedEndpointEditBtn" type="button">Cancel Edit</button>
+              </div>
+              <div class="inline">
+                <select id="manageGroupSelect"></select>
+                <input id="manageGroupNameInput" type="text" placeholder="Rename selected group" />
+                <button id="renameGroupBtn" type="button">Rename Group</button>
+              </div>
+              <div id="manageEndpointStatus" class="helper-text"></div>
+              <div id="manageEndpointsList" class="endpoint-list"></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="page" data-page="routes">
+          <div class="routes-top">
+            <section class="panel-card">
+              <h3>New Group</h3>
+              <div class="inline">
+                <input id="groupNameInput" type="text" placeholder="Group name" />
+                <button id="addGroupBtn" type="button">Add</button>
+              </div>
+            </section>
+
+            <section class="panel-card">
+              <h3>New Route</h3>
+              <div class="stack">
+                <input id="routeNameInput" type="text" placeholder="Route name" />
+                <select id="routeMethodInput">
+                  <option>GET</option>
+                  <option>POST</option>
+                  <option>PUT</option>
+                  <option>PATCH</option>
+                  <option>DELETE</option>
+                  <option>HEAD</option>
+                  <option>OPTIONS</option>
+                </select>
+                <input id="routeUrlInput" type="url" placeholder="https://api.example.com/items" />
+                <select id="routeGroupSelect"></select>
+                <button id="addRouteBtn" type="button">Add Route</button>
+              </div>
+            </section>
+
+            <section class="panel-card tree-wrap">
+              <h3>Routes</h3>
+              <div id="routeTree" class="route-tree"></div>
+            </section>
           </div>
-          <label>
-            URL
-            <input id="selectedRouteUrl" type="url" placeholder="https://api.example.com/items" />
-          </label>
-          <label>
-            Headers (JSON or key:value per line)
-            <textarea id="selectedRouteHeaders" rows="5" placeholder="{&quot;Authorization&quot;: &quot;Bearer ...&quot;}"></textarea>
-          </label>
-          <label>
-            Body
-            <textarea id="selectedRouteBody" rows="8" placeholder="{&quot;name&quot;: &quot;Sample&quot;}"></textarea>
-          </label>
-          <div class="inline">
-            <button id="sendRequestBtn" type="button">Send Request</button>
-            <span id="responseMeta"></span>
+
+          <div class="tester-wrap">
+            <div id="emptyState" class="empty-state">Select a route to start testing.</div>
+            <div id="tester" class="tester hidden">
+              <div class="workspace-head">
+                <input id="selectedRouteName" type="text" />
+                <div class="inline">
+                  <button id="saveRouteBtn" type="button">Save</button>
+                  <button id="deleteRouteBtn" type="button">Delete</button>
+                </div>
+              </div>
+              <div class="grid">
+                <label>
+                  Method
+                  <select id="selectedRouteMethod">
+                    <option>GET</option>
+                    <option>POST</option>
+                    <option>PUT</option>
+                    <option>PATCH</option>
+                    <option>DELETE</option>
+                    <option>HEAD</option>
+                    <option>OPTIONS</option>
+                  </select>
+                </label>
+                <label>
+                  Group
+                  <select id="selectedRouteGroup"></select>
+                </label>
+              </div>
+              <label>
+                URL
+                <input id="selectedRouteUrl" type="url" placeholder="https://api.example.com/items" />
+              </label>
+              <label>
+                Headers (JSON or key:value per line)
+                <textarea id="selectedRouteHeaders" rows="5" placeholder="{&quot;Authorization&quot;: &quot;Bearer ...&quot;}"></textarea>
+              </label>
+              <label>
+                Body
+                <textarea id="selectedRouteBody" rows="8" placeholder="{&quot;name&quot;: &quot;Sample&quot;}"></textarea>
+              </label>
+              <div class="inline">
+                <button id="sendRequestBtn" type="button">Send Request</button>
+                <span id="responseMeta"></span>
+              </div>
+              <div class="response-wrap">
+                <h4>Response Headers</h4>
+                <pre id="responseHeaders"></pre>
+                <h4>Response Body</h4>
+                <pre id="responseBody"></pre>
+              </div>
+            </div>
           </div>
-          <div class="response-wrap">
-            <h4>Response Headers</h4>
-            <pre id="responseHeaders"></pre>
-            <h4>Response Body</h4>
-            <pre id="responseBody"></pre>
-          </div>
-        </div>
+        </section>
+
+        <section class="page" data-page="swagger">
+          <section class="panel-card page-card">
+            <h3>Import Swagger/OpenAPI</h3>
+            <div class="stack">
+              <input id="swaggerUrlInput" type="url" placeholder="https://api.example.com/openapi.json" />
+              <button id="importSwaggerUrlBtn" type="button">Import from URL</button>
+              <textarea id="swaggerSpecInput" rows="10" placeholder="Paste OpenAPI/Swagger JSON or YAML"></textarea>
+              <button id="importSwaggerTextBtn" type="button">Import from Text</button>
+              <div id="importStatus" class="helper-text"></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="page" data-page="settings">
+          <section class="panel-card page-card">
+            <h3>Appearance</h3>
+            <div class="inline">
+              <button id="themeToggle" type="button" aria-label="Switch to dark mode" title="Switch to dark mode">
+                <span id="themeIcon" aria-hidden="true">&#128161;</span>
+              </button>
+              <span id="themeModeText" class="helper-text">Theme: Light</span>
+            </div>
+          </section>
+
+          <section class="panel-card page-card">
+            <h3>AI Settings</h3>
+            <div class="stack">
+              <select id="aiProviderSelect">
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="groq">Groq</option>
+                <option value="custom">Custom (OpenAI-compatible)</option>
+              </select>
+              <input id="aiEndpointInput" type="url" placeholder="LLM endpoint (OpenAI-compatible)" />
+              <input id="aiModelInput" type="text" placeholder="Model (e.g. gpt-4o-mini)" />
+              <input id="aiApiKeyInput" type="password" placeholder="LLM API key" />
+              <label class="check-row">
+                <input id="aiRememberKeyInput" type="checkbox" />
+                <span>Remember key for this browser session only</span>
+              </label>
+              <label class="check-row">
+                <input id="aiOneTimeKeyInput" type="checkbox" />
+                <span>One-time key mode (clear key after each AI request)</span>
+              </label>
+              <label>
+                Auto-clear key after inactivity (minutes)
+                <input id="aiAutoClearMinutesInput" type="number" min="1" step="1" value="15" />
+              </label>
+              <label class="check-row">
+                <input id="aiAllowUnsafeEndpointInput" type="checkbox" />
+                <span>Allow custom/unlisted endpoint (unsafe)</span>
+              </label>
+              <div class="helper-text">HTTPS-only endpoints are enforced.</div>
+              <button id="clearAiKeyBtn" type="button">Clear API Key</button>
+              <label class="check-row">
+                <input id="aiPrivacyModeInput" type="checkbox" checked />
+                <span>Privacy mode (redact secrets before sending to AI)</span>
+              </label>
+              <label class="check-row">
+                <input id="aiAllowSensitiveInput" type="checkbox" />
+                <span>Allow sending request headers/body to AI</span>
+              </label>
+              <button id="saveAiSettingsBtn" type="button">Save AI Settings</button>
+            </div>
+          </section>
+        </section>
+
+        <section class="page" data-page="ai-workflow">
+          <section class="panel-card page-card">
+            <h3>AI Workflow</h3>
+            <div class="stack">
+              <textarea id="aiPromptInput" rows="6" placeholder="Describe the workflow to automate"></textarea>
+              <div class="inline">
+                <button id="planAiWorkflowBtn" type="button">Generate Workflow</button>
+                <button id="runAiWorkflowBtn" type="button">Run Workflow</button>
+              </div>
+              <div id="aiStatus" class="helper-text"></div>
+              <pre id="aiWorkflowPreview" class="compact-pre"></pre>
+            </div>
+          </section>
+        </section>
       </section>
     </main>
+
     <script type="module" src="./panel.ts"></script>
   </body>
 </html>
