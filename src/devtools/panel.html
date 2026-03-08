@@ -9,41 +9,79 @@
   <body>
     <header class="toolbar">
       <strong>TestX</strong>
-      <button id="devRefreshBtn" type="button" title="Reload inspected page and extension">
-        Dev Refresh
-      </button>
+      <div class="toolbar-actions">
+        <select id="workspaceSelect" title="Active workspace"></select>
+        <button id="saveWorkspaceBtn" type="button" title="Save active workspace">Save</button>
+        <button id="devRefreshBtn" type="button" title="Reload inspected page and extension">
+          Dev Refresh
+        </button>
+      </div>
     </header>
 
     <main class="layout">
       <aside class="nav-panel">
         <div class="nav-title">Navigation</div>
-        <button class="nav-item nav-parent is-expanded" type="button" id="siteSetupMenuToggle">
-          Site Setup
+        <button class="nav-item is-active" type="button" data-page="site-setup">
+          <span class="nav-icon" aria-hidden="true">&#128188;</span><span>Workspace</span>
         </button>
-        <div class="nav-submenu" id="siteSetupSubmenu">
-          <button class="nav-subitem is-active" type="button" data-page="test-endpoints">
-            Test Endpoints
-          </button>
-          <button class="nav-subitem" type="button" data-page="manage-endpoints">
-            Manage Endpoints
-          </button>
-        </div>
-        <button class="nav-item" type="button" data-page="routes">Routes</button>
-        <button class="nav-item" type="button" data-page="swagger">Swagger Import</button>
-        <button class="nav-item" type="button" data-page="ai-workflow">AI Workflow</button>
-        <button class="nav-item" type="button" data-page="settings">Settings</button>
+        <button class="nav-item" type="button" data-page="discovery">
+          <span class="nav-icon" aria-hidden="true">&#128269;</span><span>Discovery</span>
+        </button>
+        <button class="nav-item" type="button" data-page="test-endpoints">
+          <span class="nav-icon" aria-hidden="true">&#129514;</span><span>Test Endpoints</span>
+        </button>
+        <button class="nav-item" type="button" data-page="manage-endpoints">
+          <span class="nav-icon" aria-hidden="true">&#9881;&#65039;</span><span>Manage Endpoints</span>
+        </button>
+        <button class="nav-item" type="button" data-page="routes">
+          <span class="nav-icon" aria-hidden="true">&#128279;</span><span>Routes</span>
+        </button>
+        <button class="nav-item" type="button" data-page="swagger">
+          <span class="nav-icon" aria-hidden="true">&#128196;</span><span>Swagger Import</span>
+        </button>
+        <button class="nav-item" type="button" data-page="ai-workflow">
+          <span class="nav-icon" aria-hidden="true">&#129302;</span><span>AI Workflow</span>
+        </button>
+        <button class="nav-item" type="button" data-page="settings">
+          <span class="nav-icon" aria-hidden="true">&#9881;&#65039;</span><span>Settings</span>
+        </button>
       </aside>
 
       <section class="workspace">
         <section class="page is-active" data-page="site-setup">
           <section class="panel-card page-card">
-            <h3>Initial Setup</h3>
+            <h3>Workspace</h3>
+            <div class="stack">
+              <div class="helper-text">Create new workspace</div>
+              <div class="inline">
+                <input id="workspaceNameInput" type="text" placeholder="Workspace name" />
+                <button id="createWorkspaceBtn" type="button">Create</button>
+              </div>
+              <div id="workspaceStatus" class="helper-text"></div>
+              <div id="workspaceAnalytics" class="helper-text"></div>
+              <div class="workspace-clear-section">
+                <div class="helper-text workspace-clear-label">Clear active workspace data</div>
+                <div class="inline workspace-clear-actions">
+                  <button id="clearWorkspaceBtn" type="button">Clear Workspace</button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section class="page" data-page="discovery">
+          <section class="panel-card page-card">
+            <h3>Discovery</h3>
             <div class="stack">
               <input id="siteBaseUrlInput" type="url" placeholder="https://example.com" />
               <div class="helper-text">Only base URL is used (origin without subpath).</div>
               <label>
                 Max pages to crawl
                 <input id="siteMaxPagesInput" type="number" min="1" max="30" step="1" value="6" />
+              </label>
+              <label class="check-row">
+                <input id="passiveDiscoveryEnabledInput" type="checkbox" />
+                <span>Enable passive auto-discovery from runtime network traffic</span>
               </label>
               <button id="startSiteTestingBtn" type="button">Start Testing (AI Discover Endpoints)</button>
               <div id="siteStatus" class="helper-text"></div>
@@ -284,6 +322,17 @@
         </section>
       </section>
     </main>
+
+    <div id="confirmModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
+      <div class="modal-card">
+        <h3 id="confirmModalTitle">Confirm</h3>
+        <p id="confirmModalMessage" class="helper-text"></p>
+        <div class="inline">
+          <button id="confirmModalCancelBtn" type="button">Cancel</button>
+          <button id="confirmModalConfirmBtn" type="button">Confirm</button>
+        </div>
+      </div>
+    </div>
 
     <script type="module" src="./panel.ts"></script>
   </body>

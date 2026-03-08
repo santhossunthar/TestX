@@ -13,8 +13,16 @@ const importSwaggerUrlBtn = document.querySelector<HTMLButtonElement>("#importSw
 const swaggerSpecInput = document.querySelector<HTMLTextAreaElement>("#swaggerSpecInput");
 const importSwaggerTextBtn = document.querySelector<HTMLButtonElement>("#importSwaggerTextBtn");
 const importStatus = document.querySelector<HTMLDivElement>("#importStatus");
+const workspaceSelect = document.querySelector<HTMLSelectElement>("#workspaceSelect");
+const workspaceNameInput = document.querySelector<HTMLInputElement>("#workspaceNameInput");
+const createWorkspaceBtn = document.querySelector<HTMLButtonElement>("#createWorkspaceBtn");
+const saveWorkspaceBtn = document.querySelector<HTMLButtonElement>("#saveWorkspaceBtn");
+const clearWorkspaceBtn = document.querySelector<HTMLButtonElement>("#clearWorkspaceBtn");
+const workspaceStatus = document.querySelector<HTMLDivElement>("#workspaceStatus");
+const workspaceAnalytics = document.querySelector<HTMLDivElement>("#workspaceAnalytics");
 const siteBaseUrlInput = document.querySelector<HTMLInputElement>("#siteBaseUrlInput");
 const siteMaxPagesInput = document.querySelector<HTMLInputElement>("#siteMaxPagesInput");
+const passiveDiscoveryEnabledInput = document.querySelector<HTMLInputElement>("#passiveDiscoveryEnabledInput");
 const startSiteTestingBtn = document.querySelector<HTMLButtonElement>("#startSiteTestingBtn");
 const authModeSelect = document.querySelector<HTMLSelectElement>("#authModeSelect");
 const authEmailInput = document.querySelector<HTMLInputElement>("#authEmailInput");
@@ -72,15 +80,17 @@ const sendRequestBtn = document.querySelector<HTMLButtonElement>("#sendRequestBt
 const responseMeta = document.querySelector<HTMLSpanElement>("#responseMeta");
 const responseHeaders = document.querySelector<HTMLPreElement>("#responseHeaders");
 const responseBody = document.querySelector<HTMLPreElement>("#responseBody");
+const confirmModal = document.querySelector<HTMLDivElement>("#confirmModal");
+const confirmModalTitle = document.querySelector<HTMLHeadingElement>("#confirmModalTitle");
+const confirmModalMessage = document.querySelector<HTMLParagraphElement>("#confirmModalMessage");
+const confirmModalConfirmBtn = document.querySelector<HTMLButtonElement>("#confirmModalConfirmBtn");
+const confirmModalCancelBtn = document.querySelector<HTMLButtonElement>("#confirmModalCancelBtn");
 
 const themeToggleEl = document.querySelector<HTMLButtonElement>("#themeToggle");
 const themeIconEl = document.querySelector<HTMLSpanElement>("#themeIcon");
 const themeModeText = document.querySelector<HTMLSpanElement>("#themeModeText");
 const devRefreshBtn = document.querySelector<HTMLButtonElement>("#devRefreshBtn");
-const siteSetupMenuToggle = document.querySelector<HTMLButtonElement>("#siteSetupMenuToggle");
-const siteSetupSubmenu = document.querySelector<HTMLDivElement>("#siteSetupSubmenu");
 const navItems = Array.from(document.querySelectorAll<HTMLButtonElement>(".nav-item"));
-const navSubItems = Array.from(document.querySelectorAll<HTMLButtonElement>(".nav-subitem"));
 const pages = Array.from(document.querySelectorAll<HTMLElement>(".page"));
 
 if (
@@ -97,8 +107,16 @@ if (
   !swaggerSpecInput ||
   !importSwaggerTextBtn ||
   !importStatus ||
+  !workspaceSelect ||
+  !workspaceNameInput ||
+  !createWorkspaceBtn ||
+  !saveWorkspaceBtn ||
+  !clearWorkspaceBtn ||
+  !workspaceStatus ||
+  !workspaceAnalytics ||
   !siteBaseUrlInput ||
   !siteMaxPagesInput ||
+  !passiveDiscoveryEnabledInput ||
   !startSiteTestingBtn ||
   !authModeSelect ||
   !authEmailInput ||
@@ -155,14 +173,16 @@ if (
   !responseMeta ||
   !responseHeaders ||
   !responseBody ||
+  !confirmModal ||
+  !confirmModalTitle ||
+  !confirmModalMessage ||
+  !confirmModalConfirmBtn ||
+  !confirmModalCancelBtn ||
   !devRefreshBtn ||
   !themeToggleEl ||
   !themeIconEl ||
-  !siteSetupMenuToggle ||
-  !siteSetupSubmenu ||
   navItems.length === 0 ||
-  pages.length === 0 ||
-  navSubItems.length === 0
+  pages.length === 0
 ) {
   throw new Error("Panel DOM failed to initialize.");
 }
@@ -237,11 +257,28 @@ interface DiscoveredEndpoint {
   reason?: string;
 }
 
-const APP_STATE_KEY = "testx-api-state-v1";
+interface WorkspaceItem {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface WorkspaceSetup {
+  siteBaseUrl: string;
+  siteMaxPages: number;
+  passiveDiscoveryEnabled: boolean;
+}
+
+const LEGACY_APP_STATE_KEY = "testx-api-state-v1";
 const THEME_KEY = "testx-theme";
 const AI_SETTINGS_KEY = "testx-ai-settings-v1";
 const AI_SESSION_KEY = "testx-ai-session-key";
-const DISCOVERED_ENDPOINTS_KEY = "testx-discovered-endpoints-v1";
+const AI_PERSISTENT_KEY = "testx-ai-persistent-key-v1";
+const LEGACY_DISCOVERED_ENDPOINTS_KEY = "testx-discovered-endpoints-v1";
+const WORKSPACES_KEY = "testx-workspaces-v1";
+const ACTIVE_WORKSPACE_KEY = "testx-active-workspace-v1";
+const DEFAULT_WORKSPACE_NAME = "Default Workspace";
 
 const ALLOWED_METHODS: HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 const METHOD_SET = new Set(ALLOWED_METHODS);
@@ -251,10 +288,14 @@ const AI_PROVIDER_PRESETS: Record<Exclude<AiProvider, "custom">, { endpoint: str
   groq: { endpoint: "https://api.groq.com/openai/v1/chat/completions", model: "llama-3.3-70b-versatile" }
 };
 
-const readState = (): AppState => {
-  const raw = localStorage.getItem(APP_STATE_KEY);
-  if (!raw) return { groups: [], routes: [], selectedRouteId: null };
+const defaultAppState = (): AppState => ({ groups: [], routes: [], selectedRouteId: null });
 
+const workspaceStateKey = (workspaceId: string) => `testx-workspace-${workspaceId}-state-v1`;
+const workspaceDiscoveredKey = (workspaceId: string) => `testx-workspace-${workspaceId}-discovered-v1`;
+const workspaceSetupKey = (workspaceId: string) => `testx-workspace-${workspaceId}-setup-v1`;
+
+const parseStateRaw = (raw: string | null): AppState => {
+  if (!raw) return defaultAppState();
   try {
     const parsed = JSON.parse(raw) as Partial<AppState>;
     return {
@@ -263,7 +304,7 @@ const readState = (): AppState => {
       selectedRouteId: typeof parsed.selectedRouteId === "string" ? parsed.selectedRouteId : null
     };
   } catch {
-    return { groups: [], routes: [], selectedRouteId: null };
+    return defaultAppState();
   }
 };
 
@@ -272,8 +313,7 @@ const normalizeStoredGroup = (value: string): string => {
   return trimmed || "General";
 };
 
-const readDiscoveredEndpoints = (): DiscoveredEndpoint[] => {
-  const raw = localStorage.getItem(DISCOVERED_ENDPOINTS_KEY);
+const parseDiscoveredRaw = (raw: string | null): DiscoveredEndpoint[] => {
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
@@ -306,8 +346,118 @@ const readDiscoveredEndpoints = (): DiscoveredEndpoint[] => {
   }
 };
 
+const readWorkspaces = (): WorkspaceItem[] => {
+  const raw = localStorage.getItem(WORKSPACES_KEY);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((item) => item && typeof item === "object")
+      .map((item) => {
+        const ws = item as Partial<WorkspaceItem>;
+        return {
+          id: typeof ws.id === "string" && ws.id ? ws.id : crypto.randomUUID(),
+          name: typeof ws.name === "string" && ws.name.trim() ? ws.name.trim() : "Workspace",
+          createdAt: typeof ws.createdAt === "string" ? ws.createdAt : new Date().toISOString(),
+          updatedAt: typeof ws.updatedAt === "string" ? ws.updatedAt : new Date().toISOString()
+        };
+      });
+  } catch {
+    return [];
+  }
+};
+
+const saveWorkspaces = (items: WorkspaceItem[]) => {
+  localStorage.setItem(WORKSPACES_KEY, JSON.stringify(items));
+};
+
+const createWorkspaceItem = (name: string): WorkspaceItem => {
+  const now = new Date().toISOString();
+  return { id: crypto.randomUUID(), name: name.trim(), createdAt: now, updatedAt: now };
+};
+
+const defaultWorkspaceSetup = (): WorkspaceSetup => ({
+  siteBaseUrl: "",
+  siteMaxPages: 6,
+  passiveDiscoveryEnabled: false
+});
+
+const readWorkspaceSetup = (workspaceId: string): WorkspaceSetup => {
+  const raw = localStorage.getItem(workspaceSetupKey(workspaceId));
+  if (!raw) return defaultWorkspaceSetup();
+  try {
+    const parsed = JSON.parse(raw) as Partial<WorkspaceSetup>;
+    return {
+      siteBaseUrl: typeof parsed.siteBaseUrl === "string" ? parsed.siteBaseUrl : "",
+      siteMaxPages:
+        typeof parsed.siteMaxPages === "number" && Number.isFinite(parsed.siteMaxPages)
+          ? Math.max(1, Math.min(30, Math.floor(parsed.siteMaxPages)))
+          : 6,
+      passiveDiscoveryEnabled: parsed.passiveDiscoveryEnabled === true
+    };
+  } catch {
+    return defaultWorkspaceSetup();
+  }
+};
+
+const saveWorkspaceSetup = (workspaceId: string, setup: WorkspaceSetup) => {
+  localStorage.setItem(workspaceSetupKey(workspaceId), JSON.stringify(setup));
+};
+
+const initializeWorkspaces = (): { items: WorkspaceItem[]; activeId: string } => {
+  let items = readWorkspaces();
+  if (items.length === 0 || !items.some((item) => item.name.toLowerCase() === DEFAULT_WORKSPACE_NAME.toLowerCase())) {
+    const defaultWorkspace = createWorkspaceItem(DEFAULT_WORKSPACE_NAME);
+    items = [defaultWorkspace, ...items];
+    saveWorkspaces(items);
+  }
+
+  const defaultWorkspace = items.find(
+    (item) => item.name.toLowerCase() === DEFAULT_WORKSPACE_NAME.toLowerCase()
+  )!;
+  const activeId = defaultWorkspace.id;
+  localStorage.setItem(ACTIVE_WORKSPACE_KEY, activeId);
+
+  const scopedStateKey = workspaceStateKey(activeId);
+  const scopedDiscoveredKey = workspaceDiscoveredKey(activeId);
+  let migratedLegacy = false;
+  if (!localStorage.getItem(scopedStateKey)) {
+    const legacyStateRaw = localStorage.getItem(LEGACY_APP_STATE_KEY);
+    if (legacyStateRaw) {
+      localStorage.setItem(scopedStateKey, legacyStateRaw);
+      migratedLegacy = true;
+    }
+  }
+  if (!localStorage.getItem(scopedDiscoveredKey)) {
+    const legacyDiscoveredRaw = localStorage.getItem(LEGACY_DISCOVERED_ENDPOINTS_KEY);
+    if (legacyDiscoveredRaw) {
+      localStorage.setItem(scopedDiscoveredKey, legacyDiscoveredRaw);
+      migratedLegacy = true;
+    }
+  }
+  if (migratedLegacy) {
+    localStorage.removeItem(LEGACY_APP_STATE_KEY);
+    localStorage.removeItem(LEGACY_DISCOVERED_ENDPOINTS_KEY);
+  }
+
+  return { items, activeId };
+};
+
+const workspaceBoot = initializeWorkspaces();
+let workspaces: WorkspaceItem[] = workspaceBoot.items;
+let currentWorkspaceId = workspaceBoot.activeId;
+
+const readState = (): AppState => {
+  return parseStateRaw(localStorage.getItem(workspaceStateKey(currentWorkspaceId)));
+};
+
+const readDiscoveredEndpoints = (): DiscoveredEndpoint[] => {
+  return parseDiscoveredRaw(localStorage.getItem(workspaceDiscoveredKey(currentWorkspaceId)));
+};
+
 const saveDiscoveredEndpoints = () => {
-  localStorage.setItem(DISCOVERED_ENDPOINTS_KEY, JSON.stringify(discoveredEndpoints));
+  localStorage.setItem(workspaceDiscoveredKey(currentWorkspaceId), JSON.stringify(discoveredEndpoints));
 };
 
 let state: AppState = readState();
@@ -322,6 +472,7 @@ let awaitingManualAuthStep = false;
 let authMonitorTimer: number | null = null;
 const authMonitoredCandidates = new Set<string>();
 let runtimeDiscoveryRenderTimer: number | null = null;
+let runtimeDiscoveryPauseUntil = 0;
 
 const readAiSettings = (): AiSettings => {
   const raw = localStorage.getItem(AI_SETTINGS_KEY);
@@ -385,7 +536,7 @@ const readAiSettings = (): AiSettings => {
 let aiSettings = readAiSettings();
 
 const saveState = () => {
-  localStorage.setItem(APP_STATE_KEY, JSON.stringify(state));
+  localStorage.setItem(workspaceStateKey(currentWorkspaceId), JSON.stringify(state));
 };
 
 const saveAiSettings = () => {
@@ -423,6 +574,19 @@ const clearSessionApiKey = async (): Promise<void> => {
   });
 };
 
+const getPersistentApiKey = (): string => {
+  const value = localStorage.getItem(AI_PERSISTENT_KEY);
+  return typeof value === "string" ? value : "";
+};
+
+const setPersistentApiKey = (key: string) => {
+  localStorage.setItem(AI_PERSISTENT_KEY, key);
+};
+
+const clearPersistentApiKey = () => {
+  localStorage.removeItem(AI_PERSISTENT_KEY);
+};
+
 const PROVIDER_HOST_ALLOWLIST: Record<Exclude<AiProvider, "custom">, string[]> = {
   openai: ["api.openai.com"],
   anthropic: ["api.anthropic.com"],
@@ -446,6 +610,7 @@ const clearApiKeyNow = async (message?: string) => {
   aiApiKeyMemory = "";
   aiApiKeyInput.value = "";
   await clearSessionApiKey();
+  clearPersistentApiKey();
   if (keyAutoClearTimer) {
     window.clearTimeout(keyAutoClearTimer);
     keyAutoClearTimer = null;
@@ -483,6 +648,36 @@ const sleep = (ms: number): Promise<void> =>
     window.setTimeout(resolve, ms);
   });
 
+const showConfirmDialog = (title: string, message: string): Promise<boolean> =>
+  new Promise((resolve) => {
+    confirmModalTitle.textContent = title;
+    confirmModalMessage.textContent = message;
+    confirmModal.classList.remove("hidden");
+
+    const close = (result: boolean) => {
+      confirmModal.classList.add("hidden");
+      confirmModalConfirmBtn.removeEventListener("click", onConfirm);
+      confirmModalCancelBtn.removeEventListener("click", onCancel);
+      confirmModal.removeEventListener("click", onBackdrop);
+      window.removeEventListener("keydown", onKeyDown);
+      resolve(result);
+    };
+
+    const onConfirm = () => close(true);
+    const onCancel = () => close(false);
+    const onBackdrop = (event: MouseEvent) => {
+      if (event.target === confirmModal) close(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close(false);
+    };
+
+    confirmModalConfirmBtn.addEventListener("click", onConfirm);
+    confirmModalCancelBtn.addEventListener("click", onCancel);
+    confirmModal.addEventListener("click", onBackdrop);
+    window.addEventListener("keydown", onKeyDown);
+  });
+
 const stopAuthMonitoring = () => {
   if (authMonitorTimer) {
     window.clearInterval(authMonitorTimer);
@@ -507,6 +702,79 @@ const getInitialTheme = (): Theme => {
 const normalizeBaseSiteUrl = (raw: string): string => {
   const parsed = new URL(raw);
   return parsed.origin;
+};
+
+const getWorkspaceSetupFromInputs = (): WorkspaceSetup => ({
+  siteBaseUrl: siteBaseUrlInput.value.trim(),
+  siteMaxPages: Math.max(1, Math.min(30, Number.parseInt(siteMaxPagesInput.value || "6", 10) || 6)),
+  passiveDiscoveryEnabled: passiveDiscoveryEnabledInput.checked
+});
+
+const touchWorkspaceUpdatedAt = (workspaceId: string) => {
+  const now = new Date().toISOString();
+  workspaces = workspaces.map((workspace) =>
+    workspace.id === workspaceId ? { ...workspace, updatedAt: now } : workspace
+  );
+  saveWorkspaces(workspaces);
+};
+
+const saveWorkspaceSnapshot = () => {
+  saveState();
+  saveDiscoveredEndpoints();
+  saveWorkspaceSetup(currentWorkspaceId, getWorkspaceSetupFromInputs());
+  touchWorkspaceUpdatedAt(currentWorkspaceId);
+  renderWorkspaceAnalytics();
+};
+
+const renderWorkspaceAnalytics = () => {
+  const active = workspaces.find((workspace) => workspace.id === currentWorkspaceId);
+  const setup = readWorkspaceSetup(currentWorkspaceId);
+  const updatedLabel = active?.updatedAt ? new Date(active.updatedAt).toLocaleString() : "N/A";
+  const lines = [
+    `Active: ${active?.name ?? "Unknown"}`,
+    `Updated: ${updatedLabel}`,
+    `Groups: ${state.groups.length}`,
+    `Routes: ${state.routes.length}`,
+    `Discovered: ${discoveredEndpoints.length}`,
+    `Site: ${setup.siteBaseUrl || "Not set"}`,
+    `Passive: ${setup.passiveDiscoveryEnabled ? "On" : "Off"}`
+  ];
+  workspaceAnalytics.textContent = lines.join(" | ");
+};
+
+const renderWorkspaceOptions = () => {
+  const previous = workspaceSelect.value;
+  workspaceSelect.innerHTML = workspaces
+    .map((workspace) => `<option value="${workspace.id}">${workspace.name}</option>`)
+    .join("");
+  if (workspaces.some((workspace) => workspace.id === previous)) {
+    workspaceSelect.value = previous;
+  } else {
+    workspaceSelect.value = currentWorkspaceId;
+  }
+};
+
+const loadWorkspaceIntoPanel = (workspaceId: string) => {
+  currentWorkspaceId = workspaceId;
+  localStorage.setItem(ACTIVE_WORKSPACE_KEY, workspaceId);
+  state = readState();
+  discoveredEndpoints = readDiscoveredEndpoints();
+  const setup = readWorkspaceSetup(workspaceId);
+  siteBaseUrlInput.value = setup.siteBaseUrl || "";
+  siteMaxPagesInput.value = String(setup.siteMaxPages || 6);
+  passiveDiscoveryEnabledInput.checked = setup.passiveDiscoveryEnabled;
+  editingDiscoveredEndpointId = null;
+  currentWorkflow = null;
+  aiWorkflowPreview.textContent = "";
+  renderWorkspaceOptions();
+  renderDiscoveredEndpoints();
+  render();
+};
+
+const clearWorkspaceData = (workspaceId: string) => {
+  localStorage.setItem(workspaceStateKey(workspaceId), JSON.stringify(defaultAppState()));
+  localStorage.setItem(workspaceDiscoveredKey(workspaceId), JSON.stringify([]));
+  localStorage.setItem(workspaceSetupKey(workspaceId), JSON.stringify(defaultWorkspaceSetup()));
 };
 
 const syncAuthModeInputs = () => {
@@ -538,19 +806,9 @@ const setActivePage = (pageId: string) => {
   navItems.forEach((item) => {
     item.classList.toggle("is-active", item.dataset.page === pageId);
   });
-  navSubItems.forEach((item) => {
-    item.classList.toggle("is-active", item.dataset.page === pageId);
-  });
   pages.forEach((page) => {
     page.classList.toggle("is-active", page.dataset.page === pageId);
   });
-  const siteSubActive =
-    pageId === "site-setup" || pageId === "test-endpoints" || pageId === "manage-endpoints";
-  siteSetupMenuToggle.classList.toggle("is-active", siteSubActive);
-  if (siteSubActive) {
-    siteSetupMenuToggle.classList.add("is-expanded");
-    siteSetupSubmenu.classList.remove("is-collapsed");
-  }
 };
 
 navItems.forEach((item) => {
@@ -559,20 +817,6 @@ navItems.forEach((item) => {
     if (!pageId) return;
     setActivePage(pageId);
   });
-});
-
-navSubItems.forEach((item) => {
-  item.addEventListener("click", () => {
-    const pageId = item.dataset.page;
-    if (!pageId) return;
-    setActivePage(pageId);
-  });
-});
-
-siteSetupMenuToggle.addEventListener("click", () => {
-  siteSetupMenuToggle.classList.add("is-expanded");
-  siteSetupSubmenu.classList.remove("is-collapsed");
-  setActivePage("site-setup");
 });
 
 const getSelectedRoute = (): ApiRoute | undefined =>
@@ -665,6 +909,7 @@ const render = () => {
   setGroupSelectOptions(routeGroupSelect, null);
   renderTree();
   renderEditor();
+  renderWorkspaceAnalytics();
 };
 
 const parseHeaders = (raw: string): Record<string, string> => {
@@ -977,6 +1222,7 @@ const updateAiSettingsFromInputs = () => {
 const persistApiKeyMode = async () => {
   if (aiSettings.oneTimeKeyMode) {
     await clearSessionApiKey();
+    clearPersistentApiKey();
     return;
   }
   if (aiSettings.rememberKeyInSession) {
@@ -987,6 +1233,11 @@ const persistApiKeyMode = async () => {
     }
   } else {
     await clearSessionApiKey();
+  }
+  if (aiApiKeyMemory) {
+    setPersistentApiKey(aiApiKeyMemory);
+  } else {
+    clearPersistentApiKey();
   }
 };
 
@@ -1434,6 +1685,7 @@ const runDiscovery = async (baseUrlRaw: string): Promise<void> => {
         return;
       }
       siteBaseUrlInput.value = normalizedUrl;
+      saveWorkspaceSetup(currentWorkspaceId, getWorkspaceSetupFromInputs());
     } catch {
       siteStatus.textContent = "Invalid site URL.";
       return;
@@ -1849,6 +2101,7 @@ const renderDiscoveredEndpoints = () => {
   renderTestEndpointsList();
   renderManageEndpointsList();
   renderManageGroupOptions();
+  renderWorkspaceAnalytics();
 };
 
 const scheduleRuntimeDiscoveredRender = () => {
@@ -2055,6 +2308,76 @@ cancelAuthSessionBtn.addEventListener("click", () => {
   authStatus.textContent = "Manual auth session canceled.";
 });
 
+workspaceSelect.addEventListener("change", () => {
+  const nextId = workspaceSelect.value;
+  if (nextId === currentWorkspaceId) {
+    workspaceStatus.textContent = "";
+    return;
+  }
+  saveWorkspaceSnapshot();
+  loadWorkspaceIntoPanel(nextId);
+});
+
+createWorkspaceBtn.addEventListener("click", () => {
+  const name = workspaceNameInput.value.trim();
+  if (!name) {
+    workspaceStatus.textContent = "Enter a workspace name.";
+    return;
+  }
+  const exists = workspaces.some((workspace) => workspace.name.toLowerCase() === name.toLowerCase());
+  if (exists) {
+    workspaceStatus.textContent = "Workspace name already exists.";
+    return;
+  }
+
+  saveWorkspaceSnapshot();
+  const workspace = createWorkspaceItem(name);
+  workspaces = [...workspaces, workspace];
+  saveWorkspaces(workspaces);
+  workspaceNameInput.value = "";
+  loadWorkspaceIntoPanel(workspace.id);
+  workspaceStatus.textContent = `Workspace "${workspace.name}" created.`;
+});
+
+saveWorkspaceBtn.addEventListener("click", () => {
+  saveWorkspaceSnapshot();
+  const current = workspaces.find((workspace) => workspace.id === currentWorkspaceId);
+  workspaceStatus.textContent = current
+    ? `Workspace "${current.name}" saved.`
+    : "Workspace saved.";
+});
+
+clearWorkspaceBtn.addEventListener("click", async () => {
+  const current = workspaces.find((workspace) => workspace.id === currentWorkspaceId);
+  if (!current) return;
+  const confirmed = await showConfirmDialog(
+    "Clear Workspace",
+    `Clear all data in workspace "${current.name}"? This cannot be undone.`
+  );
+  if (!confirmed) return;
+
+  awaitingManualAuthStep = false;
+  continueAuthDiscoveryBtn.disabled = true;
+  cancelAuthSessionBtn.disabled = true;
+  stopAuthMonitoring();
+  authMonitoredCandidates.clear();
+  runtimeDiscoveryPauseUntil = Date.now() + 10000;
+
+  clearWorkspaceData(currentWorkspaceId);
+  state = defaultAppState();
+  discoveredEndpoints = [];
+  editingDiscoveredEndpointId = null;
+  const setup = defaultWorkspaceSetup();
+  siteBaseUrlInput.value = setup.siteBaseUrl;
+  siteMaxPagesInput.value = String(setup.siteMaxPages);
+  passiveDiscoveryEnabledInput.checked = setup.passiveDiscoveryEnabled;
+  saveWorkspaceSetup(currentWorkspaceId, setup);
+  renderDiscoveredEndpoints();
+  render();
+  touchWorkspaceUpdatedAt(currentWorkspaceId);
+  workspaceStatus.textContent = `Workspace "${current.name}" cleared.`;
+});
+
 addDiscoveredRoutesBtn.addEventListener("click", () => {
   const added = addDiscoveredEndpointsToRoutes();
   siteStatus.textContent =
@@ -2065,25 +2388,58 @@ renderDiscoveredEndpoints();
 resetManagedEndpointForm();
 syncAuthModeInputs();
 authModeSelect.addEventListener("change", syncAuthModeInputs);
+renderWorkspaceOptions();
+workspaceSelect.value = currentWorkspaceId;
+const initialSetup = readWorkspaceSetup(currentWorkspaceId);
+siteBaseUrlInput.value = initialSetup.siteBaseUrl || siteBaseUrlInput.value;
+siteMaxPagesInput.value = String(initialSetup.siteMaxPages || 6);
+passiveDiscoveryEnabledInput.checked = initialSetup.passiveDiscoveryEnabled;
 
 syncAiInputsFromSettings();
 aiWorkflowPreview.textContent = "";
 aiApiKeyInput.addEventListener("input", () => {
   aiApiKeyMemory = aiApiKeyInput.value.trim();
+  if (aiSettings.oneTimeKeyMode) {
+    clearPersistentApiKey();
+  } else if (aiApiKeyMemory) {
+    setPersistentApiKey(aiApiKeyMemory);
+  } else {
+    clearPersistentApiKey();
+  }
+  if (aiSettings.rememberKeyInSession && !aiSettings.oneTimeKeyMode) {
+    void setSessionApiKey(aiApiKeyMemory);
+  }
   scheduleKeyAutoClear();
 });
 
 siteBaseUrlInput.addEventListener("blur", () => {
   const value = siteBaseUrlInput.value.trim();
-  if (!value) return;
-  try {
-    siteBaseUrlInput.value = normalizeBaseSiteUrl(value);
-  } catch {}
+  if (value) {
+    try {
+      siteBaseUrlInput.value = normalizeBaseSiteUrl(value);
+    } catch {}
+  }
+  saveWorkspaceSetup(currentWorkspaceId, getWorkspaceSetupFromInputs());
+});
+
+siteMaxPagesInput.addEventListener("change", () => {
+  saveWorkspaceSetup(currentWorkspaceId, getWorkspaceSetupFromInputs());
+});
+
+passiveDiscoveryEnabledInput.addEventListener("change", () => {
+  saveWorkspaceSetup(currentWorkspaceId, getWorkspaceSetupFromInputs());
+  renderWorkspaceAnalytics();
 });
 
 void (async () => {
   if (aiSettings.rememberKeyInSession && !aiSettings.oneTimeKeyMode) {
     aiApiKeyMemory = await getSessionApiKey();
+    if (!aiApiKeyMemory) {
+      aiApiKeyMemory = getPersistentApiKey();
+    }
+    aiApiKeyInput.value = aiApiKeyMemory;
+  } else if (!aiSettings.oneTimeKeyMode) {
+    aiApiKeyMemory = getPersistentApiKey();
     aiApiKeyInput.value = aiApiKeyMemory;
   } else {
     aiApiKeyMemory = "";
@@ -2099,6 +2455,7 @@ void (async () => {
         } catch {
           siteBaseUrlInput.value = result;
         }
+        saveWorkspaceSetup(currentWorkspaceId, getWorkspaceSetupFromInputs());
       }
     });
   }
@@ -2140,8 +2497,8 @@ saveAiSettingsBtn.addEventListener("click", async () => {
   aiStatus.textContent = aiSettings.oneTimeKeyMode
     ? "AI settings saved. One-time key mode is active."
     : aiSettings.rememberKeyInSession
-      ? "AI settings saved. API key is stored for this browser session only."
-      : "AI settings saved. API key is kept in memory only.";
+      ? "AI settings saved. API key is stored in session and local storage (dev)."
+      : "AI settings saved. API key is stored in local storage (dev).";
 });
 
 planAiWorkflowBtn.addEventListener("click", async () => {
@@ -2175,7 +2532,7 @@ planAiWorkflowBtn.addEventListener("click", async () => {
 });
 
 clearAiKeyBtn.addEventListener("click", async () => {
-  await clearApiKeyNow("API key cleared from memory and session storage.");
+  await clearApiKeyNow("API key cleared from memory, session storage, and local storage.");
 });
 
 runAiWorkflowBtn.addEventListener("click", async () => {
@@ -2327,6 +2684,8 @@ chrome.devtools.network.onNavigated.addListener(() => {
 });
 
 chrome.devtools.network.onRequestFinished.addListener((entry) => {
+  if (Date.now() < runtimeDiscoveryPauseUntil) return;
+  if (!passiveDiscoveryEnabledInput.checked) return;
   const rawUrl = entry?.request?.url;
   if (!rawUrl || typeof rawUrl !== "string") return;
   const methodCandidate = (entry?.request?.method || "GET").toUpperCase();
@@ -2350,6 +2709,10 @@ chrome.devtools.network.onRequestFinished.addListener((entry) => {
   if (added > 0) {
     scheduleRuntimeDiscoveredRender();
   }
+});
+
+window.addEventListener("beforeunload", () => {
+  saveWorkspaceSnapshot();
 });
 
 setActivePage("site-setup");
