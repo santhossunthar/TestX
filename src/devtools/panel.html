@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inspector+</title>
+    <link rel="stylesheet" href="./panel.css" />
+  </head>
+  <body>
+    <header class="toolbar">
+      <strong>Inspector+</strong>
+      <label>
+        Type
+        <select id="typeFilter">
+          <option value="all">All</option>
+          <option value="network">Network</option>
+          <option value="console">Console</option>
+          <option value="storage">Storage</option>
+        </select>
+      </label>
+      <input id="searchInput" type="search" placeholder="Search URL, args, keys..." />
+      <button id="snapshotBtn">Refresh Storage</button>
+      <button id="exportBtn">Export JSON</button>
+    </header>
+    <main>
+      <div id="count"></div>
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Type</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </main>
+    <script type="module" src="./panel.ts"></script>
+  </body>
+</html>
