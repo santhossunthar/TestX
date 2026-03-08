@@ -1,7 +1,7 @@
-# Inspector+ DevTools Extension (MVP)
+# TestX DevTools Extension (MVP)
 
 ## What it does
-- Adds an `Inspector+` tab to Chrome DevTools.
+- Adds a `TestX` tab to Chrome DevTools.
 - Streams network requests from DevTools API.
 - Captures page `console.log/info/warn/error`.
 - Supports manual storage snapshot (`localStorage`, `sessionStorage`, `cookie` counts).
@@ -20,7 +20,7 @@
 2. Enable `Developer mode`.
 3. Click `Load unpacked`.
 4. Select the `dist` folder in this project.
-5. Open any site, open DevTools (`F12`), then open the `Inspector+` tab.
+5. Open any site, open DevTools (`F12`), then open the `TestX` tab.
 
 ## Notes
 - This extension adds a custom DevTools panel. It does not replace native `Network`, `Console`, or `Application` tabs.

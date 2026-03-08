@@ -10,12 +10,16 @@ const typeFilterEl = document.querySelector<HTMLSelectElement>("#typeFilter");
 const searchInputEl = document.querySelector<HTMLInputElement>("#searchInput");
 const snapshotBtnEl = document.querySelector<HTMLButtonElement>("#snapshotBtn");
 const exportBtnEl = document.querySelector<HTMLButtonElement>("#exportBtn");
+const themeToggleEl = document.querySelector<HTMLButtonElement>("#themeToggle");
+const themeIconEl = document.querySelector<HTMLSpanElement>("#themeIcon");
 
 if (
   !rowsEl ||
   !countEl ||
   !typeFilterEl ||
   !searchInputEl ||
+  !themeToggleEl ||
+  !themeIconEl ||
   !snapshotBtnEl ||
   !exportBtnEl
 ) {
@@ -23,6 +27,28 @@ if (
 }
 
 let events: InspectorEvent[] = [];
+type Theme = "light" | "dark";
+const THEME_KEY = "testx-theme";
+
+const getInitialTheme = (): Theme => {
+  const stored = localStorage.getItem(THEME_KEY);
+  if (stored === "light" || stored === "dark") return stored;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+};
+
+const applyTheme = (theme: Theme) => {
+  document.documentElement.dataset.theme = theme;
+  const switchTo = theme === "dark" ? "light" : "dark";
+  const label = `Switch to ${switchTo} mode`;
+  themeToggleEl.setAttribute("aria-label", label);
+  themeToggleEl.setAttribute("title", label);
+  themeIconEl.textContent = "💡";
+  themeIconEl.dataset.state = theme === "dark" ? "on" : "off";
+  localStorage.setItem(THEME_KEY, theme);
+};
+
+let currentTheme: Theme = getInitialTheme();
+applyTheme(currentTheme);
 
 const fmtTime = (ts: number): string => new Date(ts).toLocaleTimeString();
 
@@ -133,7 +159,12 @@ exportBtnEl.addEventListener("click", () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `inspector-plus-${tabId}-${Date.now()}.json`;
+  a.download = `testx-${tabId}-${Date.now()}.json`;
   a.click();
   URL.revokeObjectURL(url);
+});
+
+themeToggleEl.addEventListener("click", () => {
+  currentTheme = currentTheme === "dark" ? "light" : "dark";
+  applyTheme(currentTheme);
 });

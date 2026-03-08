@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Inspector+",
+  "name": "TestX",
   "version": "0.1.0",
   "description": "DevTools panel for network, console, and storage insights.",
   "devtools_page": "devtools.html",

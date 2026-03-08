@@ -2,20 +2,43 @@
   box-sizing: border-box;
 }
 
+:root {
+  --bg: #ffffff;
+  --fg: #1f2328;
+  --toolbar-bg: #f6f8fa;
+  --toolbar-border: #d0d7de;
+  --row-border: #d8dee4;
+  --muted: #57606a;
+  --input-bg: #ffffff;
+  --input-border: #8c959f;
+}
+
+:root[data-theme="dark"] {
+  --bg: #0d1117;
+  --fg: #e6edf3;
+  --toolbar-bg: #161b22;
+  --toolbar-border: #30363d;
+  --row-border: #30363d;
+  --muted: #8b949e;
+  --input-bg: #21262d;
+  --input-border: #6e7681;
+}
+
 body {
   margin: 0;
   font-family: "Segoe UI", Tahoma, sans-serif;
-  color: #1f2328;
+  color: var(--fg);
+  background: var(--bg);
 }
 
 .toolbar {
   display: grid;
-  grid-template-columns: auto auto 1fr auto auto;
+  grid-template-columns: auto auto 1fr auto auto auto;
   gap: 8px;
   align-items: center;
   padding: 8px;
-  border-bottom: 1px solid #d0d7de;
-  background: #f6f8fa;
+  border-bottom: 1px solid var(--toolbar-border);
+  background: var(--toolbar-bg);
   position: sticky;
   top: 0;
 }
@@ -24,6 +47,41 @@ body {
 .toolbar select,
 .toolbar button {
   height: 30px;
+  color: var(--fg);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  padding: 0 8px;
+}
+
+.toolbar strong {
+  white-space: nowrap;
+}
+
+#themeToggle {
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+#themeIcon {
+  transition: opacity 120ms ease, filter 120ms ease, transform 120ms ease;
+}
+
+#themeIcon[data-state="on"] {
+  opacity: 1;
+  filter: saturate(1.1);
+  transform: scale(1);
+}
+
+#themeIcon[data-state="off"] {
+  opacity: 0.45;
+  filter: grayscale(0.9);
+  transform: scale(0.95);
 }
 
 main {
@@ -33,7 +91,7 @@ main {
 #count {
   margin-bottom: 8px;
   font-size: 12px;
-  color: #57606a;
+  color: var(--muted);
 }
 
 table {
@@ -44,7 +102,7 @@ table {
 
 th,
 td {
-  border-bottom: 1px solid #d8dee4;
+  border-bottom: 1px solid var(--row-border);
   text-align: left;
   padding: 6px;
   font-size: 12px;

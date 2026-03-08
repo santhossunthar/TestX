@@ -3,12 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Inspector+</title>
+    <title>TestX</title>
     <link rel="stylesheet" href="./panel.css" />
   </head>
   <body>
     <header class="toolbar">
-      <strong>Inspector+</strong>
+      <strong>TestX</strong>
       <label>
         Type
         <select id="typeFilter">
@@ -19,6 +19,9 @@
         </select>
       </label>
       <input id="searchInput" type="search" placeholder="Search URL, args, keys..." />
+      <button id="themeToggle" type="button" aria-label="Switch to dark mode" title="Switch to dark mode">
+        <span id="themeIcon" aria-hidden="true">💡</span>
+      </button>
       <button id="snapshotBtn">Refresh Storage</button>
       <button id="exportBtn">Export JSON</button>
     </header>
