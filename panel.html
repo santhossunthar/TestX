@@ -30,8 +30,17 @@
         <button class="nav-item" type="button" data-page="test-endpoints">
           <span class="nav-icon" aria-hidden="true">&#129514;</span><span>Test Endpoints</span>
         </button>
+        <button class="nav-item" type="button" data-page="test-results">
+          <span class="nav-icon" aria-hidden="true">&#128202;</span><span>Test Results</span>
+        </button>
         <button class="nav-item" type="button" data-page="manage-endpoints">
           <span class="nav-icon" aria-hidden="true">&#9881;&#65039;</span><span>Manage Endpoints</span>
+        </button>
+        <button class="nav-item" type="button" data-page="repeater">
+          <span class="nav-icon" aria-hidden="true">&#128257;</span><span>Repeater</span>
+        </button>
+        <button class="nav-item" type="button" data-page="secrets">
+          <span class="nav-icon" aria-hidden="true">&#128273;</span><span>Secrets</span>
         </button>
         <button class="nav-item" type="button" data-page="routes">
           <span class="nav-icon" aria-hidden="true">&#128279;</span><span>Routes</span>
@@ -73,6 +82,7 @@
           <section class="panel-card page-card">
             <h3>Discovery</h3>
             <div class="stack">
+              <h4>Discovery Configuration</h4>
               <input id="siteBaseUrlInput" type="url" placeholder="https://example.com" />
               <div class="helper-text">Only base URL is used (origin without subpath).</div>
               <label>
@@ -85,26 +95,27 @@
               </label>
               <button id="startSiteTestingBtn" type="button">Start Testing (AI Discover Endpoints)</button>
               <div id="siteStatus" class="helper-text"></div>
-              <hr />
-              <h4>Credential-Assisted Discovery</h4>
-              <select id="authModeSelect">
-                <option value="signin">Sign In</option>
-                <option value="signup">Sign Up</option>
-              </select>
-              <input id="authEmailInput" type="text" placeholder="Email (optional)" />
-              <input id="authUsernameInput" type="text" placeholder="Username (optional)" />
-              <input id="authPasswordInput" type="password" placeholder="Password" />
-              <input id="authConfirmPasswordInput" type="password" placeholder="Confirm password (for sign up)" />
-              <label class="check-row">
-                <input id="authRequiresManualStepInput" type="checkbox" />
-                <span>OTP/manual verification required (I will complete it manually)</span>
-              </label>
-              <button id="runAuthDiscoveryBtn" type="button">Run Auth Flow + Discover</button>
-              <div class="inline">
-                <button id="continueAuthDiscoveryBtn" type="button" disabled>Continue Discovery After OTP</button>
-                <button id="cancelAuthSessionBtn" type="button" disabled>Cancel Auth Session</button>
+              <div class="workspace-clear-section">
+                <h4>Credential-Assisted Discovery</h4>
+                <select id="authModeSelect">
+                  <option value="signin">Sign In</option>
+                  <option value="signup">Sign Up</option>
+                </select>
+                <input id="authEmailInput" type="text" placeholder="Email (optional)" />
+                <input id="authUsernameInput" type="text" placeholder="Username (optional)" />
+                <input id="authPasswordInput" type="password" placeholder="Password" />
+                <input id="authConfirmPasswordInput" type="password" placeholder="Confirm password (for sign up)" />
+                <label class="check-row">
+                  <input id="authRequiresManualStepInput" type="checkbox" />
+                  <span>OTP/manual verification required (I will complete it manually)</span>
+                </label>
+                <button id="runAuthDiscoveryBtn" type="button">Run Auth Flow + Discover</button>
+                <div class="inline">
+                  <button id="continueAuthDiscoveryBtn" type="button" disabled>Continue Discovery After OTP</button>
+                  <button id="cancelAuthSessionBtn" type="button" disabled>Cancel Auth Session</button>
+                </div>
+                <div id="authStatus" class="helper-text"></div>
               </div>
-              <div id="authStatus" class="helper-text"></div>
             </div>
           </section>
         </section>
@@ -113,8 +124,26 @@
           <section class="panel-card page-card">
             <h3>Test Endpoints</h3>
             <div class="stack">
+              <div class="inline">
+                <label class="check-row">
+                  <input id="testSelectAllInput" type="checkbox" />
+                  <span>Select all</span>
+                </label>
+                <button id="runEndpointTestingBtn" type="button">Start Automated Testing</button>
+              </div>
+              <div id="endpointTestingStatus" class="helper-text"></div>
               <button id="addDiscoveredRoutesBtn" type="button">Add Discovered Endpoints To Routes</button>
               <div id="testEndpointsList" class="endpoint-list"></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="page" data-page="test-results">
+          <section class="panel-card page-card">
+            <h3>Test Results</h3>
+            <div class="stack">
+              <div class="helper-text">Automated test outcomes for discovered endpoints.</div>
+              <div id="testResultsList" class="endpoint-list"></div>
             </div>
           </section>
         </section>
@@ -146,6 +175,91 @@
               </div>
               <div id="manageEndpointStatus" class="helper-text"></div>
               <div id="manageEndpointsList" class="endpoint-list"></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="page" data-page="repeater">
+          <section class="panel-card page-card">
+            <h3>Repeater</h3>
+            <div class="stack">
+              <div id="repeaterTabs" class="repeater-tabs"></div>
+              <div id="repeaterEmptyState" class="helper-text">
+                No endpoint in repeater. Right-click an endpoint in Test Endpoints and choose Send to Repeater.
+              </div>
+              <div id="repeaterView" class="repeater-view hidden">
+                <div class="repeater-pane">
+                  <h4>Request</h4>
+                  <div class="stack">
+                    <div class="inline">
+                      <select id="repeaterMethodInput">
+                        <option>GET</option>
+                        <option>POST</option>
+                        <option>PUT</option>
+                        <option>PATCH</option>
+                        <option>DELETE</option>
+                        <option>HEAD</option>
+                        <option>OPTIONS</option>
+                      </select>
+                      <input id="repeaterUrlInput" type="url" placeholder="https://api.example.com/items" />
+                    </div>
+                    <label>
+                      Headers (JSON or key:value per line)
+                      <textarea id="repeaterHeadersInput" rows="5"></textarea>
+                    </label>
+                    <label>
+                      Body
+                      <textarea id="repeaterBodyInput" rows="8"></textarea>
+                    </label>
+                    <div class="inline">
+                      <button id="repeaterSendBtn" type="button">Send</button>
+                      <span id="repeaterResponseMeta"></span>
+                    </div>
+                  </div>
+                </div>
+                <div class="repeater-pane">
+                  <h4>Response</h4>
+                  <div class="response-wrap">
+                    <h4>Response Headers</h4>
+                    <pre id="repeaterResponseHeaders"></pre>
+                    <h4>Response Body</h4>
+                    <pre id="repeaterResponseBody"></pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section class="page" data-page="secrets">
+          <section class="panel-card page-card">
+            <h3>Secrets</h3>
+            <div class="stack">
+              <div class="helper-text">Set secrets per domain. Matching secrets are auto-applied to requests.</div>
+              <div class="inline">
+                <input id="secretDomainInput" type="text" placeholder="Domain pattern (e.g. api.example.com or *.supabase.co)" />
+                <button id="useCurrentSiteDomainBtn" type="button">Use Current Site</button>
+              </div>
+              <div class="inline">
+                <input id="secretKeyInput" type="text" placeholder="Key (e.g. apikey, Authorization)" />
+                <input id="secretValueInput" type="password" placeholder="Value" />
+              </div>
+              <div class="inline">
+                <select id="secretPlacementInput">
+                  <option value="header">Header</option>
+                  <option value="query">Query Param</option>
+                </select>
+                <label class="check-row">
+                  <input id="secretEnabledInput" type="checkbox" checked />
+                  <span>Enabled</span>
+                </label>
+              </div>
+              <div class="inline">
+                <button id="saveSecretBtn" type="button">Add Secret</button>
+                <button id="cancelSecretEditBtn" type="button">Cancel Edit</button>
+              </div>
+              <div id="secretsStatus" class="helper-text"></div>
+              <div id="secretsList" class="endpoint-list"></div>
             </div>
           </section>
         </section>
@@ -332,6 +446,10 @@
           <button id="confirmModalConfirmBtn" type="button">Confirm</button>
         </div>
       </div>
+    </div>
+
+    <div id="endpointContextMenu" class="context-menu hidden">
+      <button id="sendToRepeaterMenuItem" type="button">Send to Repeater</button>
     </div>
 
     <script type="module" src="./src/devtools/panel.ts"></script>

@@ -143,8 +143,8 @@ body {
 .endpoint-item-head {
   display: flex;
   gap: 8px;
-  align-items: center;
-  justify-content: space-between;
+  align-items: flex-start;
+  justify-content: flex-start;
 }
 
 .endpoint-item .inline button {
@@ -159,6 +159,8 @@ body {
 }
 
 .endpoint-url {
+  flex: 1;
+  min-width: 0;
   word-break: break-all;
   font-size: 12px;
 }
@@ -272,6 +274,7 @@ aside.nav-panel button.nav-item {
 #clearWorkspaceBtn::before { content: "\2715"; }
 #createWorkspaceBtn::before { content: "+"; }
 #startSiteTestingBtn::before { content: "\25b6"; }
+#runEndpointTestingBtn::before { content: "\1f9ea"; }
 #runAuthDiscoveryBtn::before { content: "\1f512"; }
 #continueAuthDiscoveryBtn::before { content: "\27a1"; }
 #cancelAuthSessionBtn::before { content: "\2715"; }
@@ -292,6 +295,13 @@ aside.nav-panel button.nav-item {
 #runAiWorkflowBtn::before { content: "\25b6"; }
 #confirmModalCancelBtn::before { content: "\2715"; }
 #confirmModalConfirmBtn::before { content: "\2713"; }
+#repeaterSendBtn::before { content: "\27a4"; }
+#sendToRepeaterMenuItem::before { content: "\27a1"; }
+#saveSecretBtn::before { content: "\2713"; }
+#cancelSecretEditBtn::before { content: "\2715"; }
+#useCurrentSiteDomainBtn::before { content: "\1f310"; }
+button[data-secret-action="edit"]::before { content: "\270e"; }
+button[data-secret-action="delete"]::before { content: "\2715"; }
 button[data-endpoint-action="edit"]::before { content: "\270e"; }
 button[data-endpoint-action="delete"]::before { content: "\2715"; }
 
@@ -469,6 +479,69 @@ pre {
   border-color: var(--accent);
 }
 
+.repeater-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.repeater-tab {
+  width: auto;
+  max-width: 300px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0 8px;
+  white-space: nowrap;
+}
+
+.repeater-tab.is-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--input-bg));
+}
+
+.repeater-tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.repeater-tab-close {
+  font-size: 14px;
+  opacity: 0.7;
+  cursor: pointer;
+}
+
+.repeater-view {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.repeater-pane {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 8px;
+}
+
+.context-menu {
+  position: fixed;
+  z-index: 1200;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 6px;
+  min-width: 180px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.context-menu button {
+  width: 100%;
+  justify-content: flex-start;
+}
+
 
 @media (max-width: 1080px) {
   .routes-top {
@@ -491,6 +564,10 @@ pre {
 
   .nav-title {
     grid-column: 1 / -1;
+  }
+
+  .repeater-view {
+    grid-template-columns: 1fr;
   }
 }
 

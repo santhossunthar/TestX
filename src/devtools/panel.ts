@@ -35,9 +35,34 @@ const continueAuthDiscoveryBtn = document.querySelector<HTMLButtonElement>("#con
 const cancelAuthSessionBtn = document.querySelector<HTMLButtonElement>("#cancelAuthSessionBtn");
 const authStatus = document.querySelector<HTMLDivElement>("#authStatus");
 const addDiscoveredRoutesBtn = document.querySelector<HTMLButtonElement>("#addDiscoveredRoutesBtn");
+const testSelectAllInput = document.querySelector<HTMLInputElement>("#testSelectAllInput");
+const runEndpointTestingBtn = document.querySelector<HTMLButtonElement>("#runEndpointTestingBtn");
+const endpointTestingStatus = document.querySelector<HTMLDivElement>("#endpointTestingStatus");
 const siteStatus = document.querySelector<HTMLDivElement>("#siteStatus");
 const testEndpointsList = document.querySelector<HTMLDivElement>("#testEndpointsList");
+const testResultsList = document.querySelector<HTMLDivElement>("#testResultsList");
 const manageEndpointsList = document.querySelector<HTMLDivElement>("#manageEndpointsList");
+const repeaterTabs = document.querySelector<HTMLDivElement>("#repeaterTabs");
+const repeaterEmptyState = document.querySelector<HTMLDivElement>("#repeaterEmptyState");
+const repeaterView = document.querySelector<HTMLDivElement>("#repeaterView");
+const repeaterMethodInput = document.querySelector<HTMLSelectElement>("#repeaterMethodInput");
+const repeaterUrlInput = document.querySelector<HTMLInputElement>("#repeaterUrlInput");
+const repeaterHeadersInput = document.querySelector<HTMLTextAreaElement>("#repeaterHeadersInput");
+const repeaterBodyInput = document.querySelector<HTMLTextAreaElement>("#repeaterBodyInput");
+const repeaterSendBtn = document.querySelector<HTMLButtonElement>("#repeaterSendBtn");
+const repeaterResponseMeta = document.querySelector<HTMLSpanElement>("#repeaterResponseMeta");
+const repeaterResponseHeaders = document.querySelector<HTMLPreElement>("#repeaterResponseHeaders");
+const repeaterResponseBody = document.querySelector<HTMLPreElement>("#repeaterResponseBody");
+const secretDomainInput = document.querySelector<HTMLInputElement>("#secretDomainInput");
+const useCurrentSiteDomainBtn = document.querySelector<HTMLButtonElement>("#useCurrentSiteDomainBtn");
+const secretKeyInput = document.querySelector<HTMLInputElement>("#secretKeyInput");
+const secretValueInput = document.querySelector<HTMLInputElement>("#secretValueInput");
+const secretPlacementInput = document.querySelector<HTMLSelectElement>("#secretPlacementInput");
+const secretEnabledInput = document.querySelector<HTMLInputElement>("#secretEnabledInput");
+const saveSecretBtn = document.querySelector<HTMLButtonElement>("#saveSecretBtn");
+const cancelSecretEditBtn = document.querySelector<HTMLButtonElement>("#cancelSecretEditBtn");
+const secretsStatus = document.querySelector<HTMLDivElement>("#secretsStatus");
+const secretsList = document.querySelector<HTMLDivElement>("#secretsList");
 const manageEndpointUrlInput = document.querySelector<HTMLInputElement>("#manageEndpointUrlInput");
 const manageEndpointMethodInput = document.querySelector<HTMLSelectElement>("#manageEndpointMethodInput");
 const manageEndpointGroupInput = document.querySelector<HTMLInputElement>("#manageEndpointGroupInput");
@@ -85,6 +110,8 @@ const confirmModalTitle = document.querySelector<HTMLHeadingElement>("#confirmMo
 const confirmModalMessage = document.querySelector<HTMLParagraphElement>("#confirmModalMessage");
 const confirmModalConfirmBtn = document.querySelector<HTMLButtonElement>("#confirmModalConfirmBtn");
 const confirmModalCancelBtn = document.querySelector<HTMLButtonElement>("#confirmModalCancelBtn");
+const endpointContextMenu = document.querySelector<HTMLDivElement>("#endpointContextMenu");
+const sendToRepeaterMenuItem = document.querySelector<HTMLButtonElement>("#sendToRepeaterMenuItem");
 
 const themeToggleEl = document.querySelector<HTMLButtonElement>("#themeToggle");
 const themeIconEl = document.querySelector<HTMLSpanElement>("#themeIcon");
@@ -129,9 +156,34 @@ if (
   !cancelAuthSessionBtn ||
   !authStatus ||
   !addDiscoveredRoutesBtn ||
+  !testSelectAllInput ||
+  !runEndpointTestingBtn ||
+  !endpointTestingStatus ||
   !siteStatus ||
   !testEndpointsList ||
+  !testResultsList ||
   !manageEndpointsList ||
+  !repeaterTabs ||
+  !repeaterEmptyState ||
+  !repeaterView ||
+  !repeaterMethodInput ||
+  !repeaterUrlInput ||
+  !repeaterHeadersInput ||
+  !repeaterBodyInput ||
+  !repeaterSendBtn ||
+  !repeaterResponseMeta ||
+  !repeaterResponseHeaders ||
+  !repeaterResponseBody ||
+  !secretDomainInput ||
+  !useCurrentSiteDomainBtn ||
+  !secretKeyInput ||
+  !secretValueInput ||
+  !secretPlacementInput ||
+  !secretEnabledInput ||
+  !saveSecretBtn ||
+  !cancelSecretEditBtn ||
+  !secretsStatus ||
+  !secretsList ||
   !manageEndpointUrlInput ||
   !manageEndpointMethodInput ||
   !manageEndpointGroupInput ||
@@ -178,6 +230,8 @@ if (
   !confirmModalMessage ||
   !confirmModalConfirmBtn ||
   !confirmModalCancelBtn ||
+  !endpointContextMenu ||
+  !sendToRepeaterMenuItem ||
   !devRefreshBtn ||
   !themeToggleEl ||
   !themeIconEl ||
@@ -257,6 +311,34 @@ interface DiscoveredEndpoint {
   reason?: string;
 }
 
+interface RepeaterEntry {
+  id: string;
+  name: string;
+  method: HttpMethod;
+  url: string;
+  headers: string;
+  body: string;
+}
+
+type SecretPlacement = "header" | "query";
+
+interface SecretEntry {
+  id: string;
+  domainPattern: string;
+  key: string;
+  value: string;
+  placement: SecretPlacement;
+  enabled: boolean;
+}
+
+interface EndpointTestResult {
+  endpointId: string;
+  status?: number;
+  elapsedMs?: number;
+  summary: string;
+  error?: string;
+}
+
 interface WorkspaceItem {
   id: string;
   name: string;
@@ -279,6 +361,7 @@ const LEGACY_DISCOVERED_ENDPOINTS_KEY = "testx-discovered-endpoints-v1";
 const WORKSPACES_KEY = "testx-workspaces-v1";
 const ACTIVE_WORKSPACE_KEY = "testx-active-workspace-v1";
 const DEFAULT_WORKSPACE_NAME = "Default Workspace";
+const SECRETS_KEY_PREFIX = "testx-workspace-";
 
 const ALLOWED_METHODS: HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 const METHOD_SET = new Set(ALLOWED_METHODS);
@@ -293,6 +376,7 @@ const defaultAppState = (): AppState => ({ groups: [], routes: [], selectedRoute
 const workspaceStateKey = (workspaceId: string) => `testx-workspace-${workspaceId}-state-v1`;
 const workspaceDiscoveredKey = (workspaceId: string) => `testx-workspace-${workspaceId}-discovered-v1`;
 const workspaceSetupKey = (workspaceId: string) => `testx-workspace-${workspaceId}-setup-v1`;
+const workspaceSecretsKey = (workspaceId: string) => `${SECRETS_KEY_PREFIX}${workspaceId}-secrets-v1`;
 
 const parseStateRaw = (raw: string | null): AppState => {
   if (!raw) return defaultAppState();
@@ -405,6 +489,55 @@ const saveWorkspaceSetup = (workspaceId: string, setup: WorkspaceSetup) => {
   localStorage.setItem(workspaceSetupKey(workspaceId), JSON.stringify(setup));
 };
 
+const normalizeDomainPattern = (raw: string): string => {
+  const value = raw.trim().toLowerCase();
+  if (!value) return "";
+  if (value === "*") return "*";
+  if (value.startsWith("http://") || value.startsWith("https://")) {
+    try {
+      return new URL(value).hostname.toLowerCase();
+    } catch {
+      return "";
+    }
+  }
+  return value.replace(/^(\*\.)?www\./, (m) => (m.startsWith("*.") ? "*." : ""));
+};
+
+const readWorkspaceSecrets = (workspaceId: string): SecretEntry[] => {
+  const raw = localStorage.getItem(workspaceSecretsKey(workspaceId));
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((item) => item && typeof item === "object")
+      .map((item) => {
+        const secret = item as Partial<SecretEntry>;
+        const domainPattern = normalizeDomainPattern(typeof secret.domainPattern === "string" ? secret.domainPattern : "");
+        const placement = secret.placement === "query" ? "query" : "header";
+        return {
+          id: typeof secret.id === "string" && secret.id ? secret.id : crypto.randomUUID(),
+          domainPattern,
+          key: typeof secret.key === "string" ? secret.key.trim() : "",
+          value: typeof secret.value === "string" ? secret.value : "",
+          placement,
+          enabled: secret.enabled !== false
+        };
+      })
+      .filter((item) => Boolean(item.domainPattern && item.key && item.value));
+  } catch {
+    return [];
+  }
+};
+
+const saveWorkspaceSecrets = (workspaceId: string) => {
+  localStorage.setItem(workspaceSecretsKey(workspaceId), JSON.stringify(secretEntries));
+};
+
+const clearWorkspaceSecrets = (workspaceId: string) => {
+  localStorage.setItem(workspaceSecretsKey(workspaceId), JSON.stringify([]));
+};
+
 const initializeWorkspaces = (): { items: WorkspaceItem[]; activeId: string } => {
   let items = readWorkspaces();
   if (items.length === 0 || !items.some((item) => item.name.toLowerCase() === DEFAULT_WORKSPACE_NAME.toLowerCase())) {
@@ -473,6 +606,15 @@ let authMonitorTimer: number | null = null;
 const authMonitoredCandidates = new Set<string>();
 let runtimeDiscoveryRenderTimer: number | null = null;
 let runtimeDiscoveryPauseUntil = 0;
+let repeaterEntries: RepeaterEntry[] = [];
+let activeRepeaterEntryId: string | null = null;
+let contextMenuEndpointId: string | null = null;
+let secretEntries: SecretEntry[] = [];
+let editingSecretId: string | null = null;
+const selectedTestEndpointIds = new Set<string>();
+const endpointTestResults = new Map<string, EndpointTestResult>();
+const endpointLastRequestBodies = new Map<string, string>();
+const endpointLastRequestHeaders = new Map<string, string>();
 
 const readAiSettings = (): AiSettings => {
   const raw = localStorage.getItem(AI_SETTINGS_KEY);
@@ -736,6 +878,7 @@ const renderWorkspaceAnalytics = () => {
     `Groups: ${state.groups.length}`,
     `Routes: ${state.routes.length}`,
     `Discovered: ${discoveredEndpoints.length}`,
+    `Secrets: ${secretEntries.length}`,
     `Site: ${setup.siteBaseUrl || "Not set"}`,
     `Passive: ${setup.passiveDiscoveryEnabled ? "On" : "Off"}`
   ];
@@ -759,14 +902,25 @@ const loadWorkspaceIntoPanel = (workspaceId: string) => {
   localStorage.setItem(ACTIVE_WORKSPACE_KEY, workspaceId);
   state = readState();
   discoveredEndpoints = readDiscoveredEndpoints();
+  selectedTestEndpointIds.clear();
+  endpointTestResults.clear();
+  endpointLastRequestBodies.clear();
+  endpointLastRequestHeaders.clear();
   const setup = readWorkspaceSetup(workspaceId);
+  secretEntries = readWorkspaceSecrets(workspaceId);
+  editingSecretId = null;
   siteBaseUrlInput.value = setup.siteBaseUrl || "";
   siteMaxPagesInput.value = String(setup.siteMaxPages || 6);
   passiveDiscoveryEnabledInput.checked = setup.passiveDiscoveryEnabled;
   editingDiscoveredEndpointId = null;
   currentWorkflow = null;
   aiWorkflowPreview.textContent = "";
+  repeaterEntries = [];
+  activeRepeaterEntryId = null;
+  hideEndpointContextMenu();
+  renderRepeater();
   renderWorkspaceOptions();
+  renderSecretsList();
   renderDiscoveredEndpoints();
   render();
 };
@@ -775,6 +929,7 @@ const clearWorkspaceData = (workspaceId: string) => {
   localStorage.setItem(workspaceStateKey(workspaceId), JSON.stringify(defaultAppState()));
   localStorage.setItem(workspaceDiscoveredKey(workspaceId), JSON.stringify([]));
   localStorage.setItem(workspaceSetupKey(workspaceId), JSON.stringify(defaultWorkspaceSetup()));
+  clearWorkspaceSecrets(workspaceId);
 };
 
 const syncAuthModeInputs = () => {
@@ -809,6 +964,20 @@ const setActivePage = (pageId: string) => {
   pages.forEach((page) => {
     page.classList.toggle("is-active", page.dataset.page === pageId);
   });
+
+  if (pageId === "discovery" && !siteBaseUrlInput.value.trim()) {
+    void (async () => {
+      const inspectedUrl = await getCurrentInspectedUrl();
+      if (!inspectedUrl || !inspectedUrl.startsWith("http")) return;
+      try {
+        siteBaseUrlInput.value = normalizeBaseSiteUrl(inspectedUrl);
+      } catch {
+        siteBaseUrlInput.value = inspectedUrl;
+      }
+      saveWorkspaceSetup(currentWorkspaceId, getWorkspaceSetupFromInputs());
+      renderWorkspaceAnalytics();
+    })();
+  }
 };
 
 navItems.forEach((item) => {
@@ -1129,14 +1298,15 @@ const executeRequest = async (
   headersInput: Record<string, string>,
   bodyInput: string
 ) => {
-  const init: RequestInit = { method, headers: headersInput };
+  const applied = applySecretsToRequest(url, headersInput);
+  const init: RequestInit = { method, headers: applied.headers };
   const allowsBody = !["GET", "DELETE", "HEAD", "OPTIONS"].includes(method);
   if (allowsBody && bodyInput.trim()) {
     init.body = bodyInput;
   }
 
   const started = performance.now();
-  const res = await fetch(url, init);
+  const res = await fetch(applied.url, init);
   const elapsed = performance.now() - started;
   const headersObj: Record<string, string> = {};
   res.headers.forEach((value, key) => {
@@ -2003,23 +2173,53 @@ addRouteBtn.addEventListener("click", () => {
 });
 
 const endpointCardHtml = (endpoint: DiscoveredEndpoint): string => {
-  const confidence =
-    typeof endpoint.confidence === "number" ? ` (${Math.round(endpoint.confidence * 100)}%)` : "";
-  const reason = endpoint.reason ? `\n${endpoint.reason}` : "";
-  return `<div class="endpoint-item">
+  const checked = selectedTestEndpointIds.has(endpoint.id) ? "checked" : "";
+  const confidenceText =
+    typeof endpoint.confidence === "number" ? `${Math.round(endpoint.confidence * 100)}%` : "Unknown";
+  const description = endpoint.reason?.trim() ? endpoint.reason.trim() : "No description";
+  const result = endpointTestResults.get(endpoint.id);
+  const resultText = result
+    ? result.error
+      ? `Failed - ${result.error}`
+      : `${result.status ?? "-"} in ${result.elapsedMs?.toFixed(0) ?? "-"}ms | ${result.summary}`
+    : "";
+  const resultLine = resultText ? `<div class="helper-text">Last Test: ${resultText}</div>` : "";
+  return `<div class="endpoint-item" data-endpoint-id="${endpoint.id}">
     <div class="endpoint-item-head">
-      <span class="endpoint-method">${endpoint.method}${confidence}</span>
+      <label class="check-row">
+        <input type="checkbox" data-endpoint-select-id="${endpoint.id}" ${checked} />
+      </label>
+      <span class="endpoint-method">${endpoint.method}</span>
       <span class="endpoint-url">${endpoint.url}</span>
     </div>
-    <div class="helper-text">Group: ${endpoint.group}${reason || ""}</div>
+    <div class="helper-text">Group: ${endpoint.group}</div>
+    <div class="helper-text">Confidence: ${confidenceText}</div>
+    <div class="helper-text">Description: ${description}</div>
+    ${resultLine}
   </div>`;
+};
+
+const syncSelectAllState = () => {
+  if (discoveredEndpoints.length === 0) {
+    testSelectAllInput.checked = false;
+    testSelectAllInput.indeterminate = false;
+    return;
+  }
+  const selectedCount = discoveredEndpoints.filter((endpoint) => selectedTestEndpointIds.has(endpoint.id)).length;
+  testSelectAllInput.checked = selectedCount === discoveredEndpoints.length;
+  testSelectAllInput.indeterminate = selectedCount > 0 && selectedCount < discoveredEndpoints.length;
 };
 
 const renderTestEndpointsList = () => {
   if (discoveredEndpoints.length === 0) {
     testEndpointsList.innerHTML = `<div class="helper-text">No discovered endpoints yet.</div>`;
+    syncSelectAllState();
     return;
   }
+  const validIds = new Set(discoveredEndpoints.map((endpoint) => endpoint.id));
+  Array.from(selectedTestEndpointIds).forEach((id) => {
+    if (!validIds.has(id)) selectedTestEndpointIds.delete(id);
+  });
   const grouped = new Map<string, DiscoveredEndpoint[]>();
   discoveredEndpoints.forEach((endpoint) => {
     const groupName = normalizeDiscoveredGroup(endpoint.group);
@@ -2034,6 +2234,54 @@ const renderTestEndpointsList = () => {
         <h4>${groupName} (${endpoints.length})</h4>
         ${endpoints.map(endpointCardHtml).join("")}
       </div>`
+    )
+    .join("");
+  syncSelectAllState();
+};
+
+const renderTestResultsList = () => {
+  const testedEndpoints = discoveredEndpoints.filter((endpoint) => endpointTestResults.has(endpoint.id));
+  if (testedEndpoints.length === 0) {
+    testResultsList.innerHTML = `<div class="helper-text">No automated test results yet.</div>`;
+    return;
+  }
+
+  const grouped = new Map<string, DiscoveredEndpoint[]>();
+  testedEndpoints.forEach((endpoint) => {
+    const groupName = normalizeDiscoveredGroup(endpoint.group);
+    const list = grouped.get(groupName) ?? [];
+    list.push(endpoint);
+    grouped.set(groupName, list);
+  });
+
+  testResultsList.innerHTML = Array.from(grouped.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(
+      ([groupName, endpoints]) => `<div class="endpoint-group">
+      <h4>${groupName} (${endpoints.length})</h4>
+      ${endpoints
+        .map((endpoint) => {
+          const result = endpointTestResults.get(endpoint.id);
+          if (!result) return "";
+          const description = endpoint.reason?.trim() || "No description";
+          const confidence = typeof endpoint.confidence === "number" ? `${Math.round(endpoint.confidence * 100)}%` : "Unknown";
+          const statusLine = result.error
+            ? `Failed - ${result.error}`
+            : `${result.status ?? "-"} in ${result.elapsedMs?.toFixed(0) ?? "-"}ms`;
+          return `<div class="endpoint-item" data-endpoint-id="${endpoint.id}">
+        <div class="endpoint-item-head">
+          <span class="endpoint-method">${endpoint.method}</span>
+          <span class="endpoint-url">${endpoint.url}</span>
+        </div>
+        <div class="helper-text">Group: ${endpoint.group}</div>
+        <div class="helper-text">Confidence: ${confidence}</div>
+        <div class="helper-text">Description: ${description}</div>
+        <div class="helper-text">Result: ${statusLine}</div>
+        <div class="helper-text">AI Summary: ${result.summary || "-"}</div>
+      </div>`;
+        })
+        .join("")}
+    </div>`
     )
     .join("");
 };
@@ -2076,7 +2324,9 @@ const renderManageEndpointsList = () => {
           <button type="button" data-endpoint-action="edit" data-endpoint-id="${endpoint.id}">Edit</button>
           <button type="button" data-endpoint-action="delete" data-endpoint-id="${endpoint.id}">Delete</button>
         </div>
-        <div class="helper-text">Group: ${endpoint.group}${endpoint.reason ? `\n${endpoint.reason}` : ""}</div>
+        <div class="helper-text">Group: ${endpoint.group}</div>
+        <div class="helper-text">Confidence: ${typeof endpoint.confidence === "number" ? `${Math.round(endpoint.confidence * 100)}%` : "Unknown"}</div>
+        <div class="helper-text">Description: ${endpoint.reason?.trim() || "No description"}</div>
       </div>`
         )
         .join("")}
@@ -2099,9 +2349,231 @@ const renderManageGroupOptions = () => {
 const renderDiscoveredEndpoints = () => {
   saveDiscoveredEndpoints();
   renderTestEndpointsList();
+  renderTestResultsList();
   renderManageEndpointsList();
   renderManageGroupOptions();
   renderWorkspaceAnalytics();
+};
+
+const requestEndpointTestAnalysis = async (
+  endpoint: DiscoveredEndpoint,
+  requestBody: string,
+  responseStatus: number,
+  responseHeaders: Record<string, string>,
+  responseText: string
+): Promise<string> => {
+  try {
+    const parsed = (await callAiForJson(
+      "You are an API test analyzer. Return only JSON object: {\"summary\":string}. Keep summary short and actionable.",
+      {
+        endpoint: { method: endpoint.method, url: endpoint.url, group: endpoint.group },
+        request: { body: requestBody ? requestBody.slice(0, 2500) : "" },
+        response: {
+          status: responseStatus,
+          headers: responseHeaders,
+          body: responseText.slice(0, 3500)
+        }
+      }
+    )) as { summary?: string };
+    if (typeof parsed.summary === "string" && parsed.summary.trim()) {
+      return parsed.summary.trim();
+    }
+  } catch {}
+  if (responseStatus >= 200 && responseStatus < 300) return `Reachable endpoint response (HTTP ${responseStatus}).`;
+  if (responseStatus >= 400 && responseStatus < 500) {
+    return `Client/auth validation issue likely (HTTP ${responseStatus}).`;
+  }
+  if (responseStatus >= 500) return `Server-side failure likely (HTTP ${responseStatus}).`;
+  return `Response received (HTTP ${responseStatus}).`;
+};
+
+const runAutomatedEndpointTesting = async (endpointIds: string[]) => {
+  if (endpointIds.length === 0) {
+    endpointTestingStatus.textContent = "No endpoints selected.";
+    return;
+  }
+  runEndpointTestingBtn.disabled = true;
+  endpointTestingStatus.textContent = `Running automated tests for ${endpointIds.length} endpoint(s)...`;
+
+  updateAiSettingsFromInputs();
+  saveAiSettings();
+  await persistApiKeyMode();
+  scheduleKeyAutoClear();
+
+  let completed = 0;
+  for (const endpointId of endpointIds) {
+    const endpoint = discoveredEndpoints.find((item) => item.id === endpointId);
+    if (!endpoint) continue;
+    const requestBody = ["POST", "PUT", "PATCH"].includes(endpoint.method) ? "{}" : "";
+    const requestHeaders = "";
+    endpointLastRequestBodies.set(endpoint.id, requestBody);
+    endpointLastRequestHeaders.set(endpoint.id, requestHeaders);
+    try {
+      const { res, elapsed, headersObj, text } = await executeRequest(endpoint.method, endpoint.url, {}, requestBody);
+      const summary = await requestEndpointTestAnalysis(endpoint, requestBody, res.status, headersObj, text);
+      endpointTestResults.set(endpoint.id, {
+        endpointId: endpoint.id,
+        status: res.status,
+        elapsedMs: elapsed,
+        summary
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      endpointTestResults.set(endpoint.id, {
+        endpointId: endpoint.id,
+        summary: "Request failed.",
+        error: message
+      });
+    }
+    completed += 1;
+    endpointTestingStatus.textContent = `Tested ${completed}/${endpointIds.length} endpoint(s)...`;
+    renderTestEndpointsList();
+    renderTestResultsList();
+  }
+
+  if (aiSettings.oneTimeKeyMode) {
+    await clearApiKeyNow("Automated endpoint testing completed. API key cleared (one-time mode).");
+  } else {
+    scheduleKeyAutoClear();
+    endpointTestingStatus.textContent = `Automated testing completed for ${endpointIds.length} endpoint(s).`;
+  }
+  runEndpointTestingBtn.disabled = false;
+  setActivePage("test-results");
+};
+
+const getActiveRepeaterEntry = (): RepeaterEntry | undefined =>
+  repeaterEntries.find((entry) => entry.id === activeRepeaterEntryId);
+
+const renderRepeater = () => {
+  if (repeaterEntries.length === 0) {
+    repeaterTabs.innerHTML = "";
+    repeaterView.classList.add("hidden");
+    repeaterEmptyState.classList.remove("hidden");
+    activeRepeaterEntryId = null;
+    return;
+  }
+
+  if (!activeRepeaterEntryId || !repeaterEntries.some((entry) => entry.id === activeRepeaterEntryId)) {
+    activeRepeaterEntryId = repeaterEntries[0].id;
+  }
+
+  repeaterTabs.innerHTML = repeaterEntries
+    .map((entry) => {
+      const activeClass = entry.id === activeRepeaterEntryId ? " is-active" : "";
+      return `<button type="button" class="repeater-tab${activeClass}" data-repeater-tab-id="${entry.id}">
+        <span class="repeater-tab-name">${entry.name}</span>
+        <span class="repeater-tab-close" data-repeater-close-id="${entry.id}" title="Close tab">&times;</span>
+      </button>`;
+    })
+    .join("");
+
+  const active = getActiveRepeaterEntry();
+  if (!active) return;
+
+  repeaterEmptyState.classList.add("hidden");
+  repeaterView.classList.remove("hidden");
+  repeaterMethodInput.value = active.method;
+  repeaterUrlInput.value = active.url;
+  repeaterHeadersInput.value = active.headers;
+  repeaterBodyInput.value = active.body;
+};
+
+const secretMatchesHost = (pattern: string, host: string): boolean => {
+  if (pattern === "*") return true;
+  const normalizedPattern = normalizeDomainPattern(pattern);
+  const normalizedHost = host.toLowerCase();
+  if (normalizedPattern.startsWith("*.")) {
+    const suffix = normalizedPattern.slice(2);
+    return normalizedHost === suffix || normalizedHost.endsWith(`.${suffix}`);
+  }
+  return normalizedHost === normalizedPattern;
+};
+
+const applySecretsToRequest = (
+  url: string,
+  headersInput: Record<string, string>
+): { url: string; headers: Record<string, string> } => {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { url, headers: headersInput };
+  }
+
+  const headers = { ...headersInput };
+  const host = parsed.hostname.toLowerCase();
+  secretEntries
+    .filter((secret) => secret.enabled && secretMatchesHost(secret.domainPattern, host))
+    .forEach((secret) => {
+      if (secret.placement === "header") {
+        if (!(secret.key in headers)) {
+          headers[secret.key] = secret.value;
+        }
+      } else {
+        if (!parsed.searchParams.has(secret.key)) {
+          parsed.searchParams.set(secret.key, secret.value);
+        }
+      }
+    });
+
+  return { url: parsed.toString(), headers };
+};
+
+const resetSecretForm = () => {
+  editingSecretId = null;
+  secretDomainInput.value = "";
+  secretKeyInput.value = "";
+  secretValueInput.value = "";
+  secretPlacementInput.value = "header";
+  secretEnabledInput.checked = true;
+  saveSecretBtn.textContent = "Add Secret";
+};
+
+const renderSecretsList = () => {
+  if (secretEntries.length === 0) {
+    secretsList.innerHTML = `<div class="helper-text">No secrets configured.</div>`;
+    return;
+  }
+  secretsList.innerHTML = secretEntries
+    .map(
+      (secret) => `<div class="endpoint-item" data-secret-id="${secret.id}">
+    <div class="endpoint-item-head">
+      <span class="endpoint-method">${secret.placement.toUpperCase()}</span>
+      <span class="endpoint-url">${secret.domainPattern} :: ${secret.key}</span>
+    </div>
+    <div class="helper-text">Value: •••••••• | ${secret.enabled ? "Enabled" : "Disabled"}</div>
+    <div class="inline">
+      <button type="button" data-secret-action="edit" data-secret-id="${secret.id}">Edit</button>
+      <button type="button" data-secret-action="delete" data-secret-id="${secret.id}">Delete</button>
+    </div>
+  </div>`
+    )
+    .join("");
+};
+
+const addEndpointToRepeater = (endpoint: DiscoveredEndpoint) => {
+  const method = METHOD_SET.has(endpoint.method) ? endpoint.method : "GET";
+  const existing = repeaterEntries.find((entry) => entry.method === method && entry.url === endpoint.url);
+  if (existing) {
+    activeRepeaterEntryId = existing.id;
+    renderRepeater();
+    return;
+  }
+
+  const savedBody = endpointLastRequestBodies.get(endpoint.id);
+  const savedHeaders = endpointLastRequestHeaders.get(endpoint.id);
+  const bodyDefault = savedBody !== undefined ? savedBody : ["POST", "PUT", "PATCH"].includes(method) ? "{}" : "";
+  const entry: RepeaterEntry = {
+    id: crypto.randomUUID(),
+    name: `${method} ${endpoint.url}`,
+    method,
+    url: endpoint.url,
+    headers: savedHeaders ?? "",
+    body: bodyDefault
+  };
+  repeaterEntries.push(entry);
+  activeRepeaterEntryId = entry.id;
+  renderRepeater();
 };
 
 const scheduleRuntimeDiscoveredRender = () => {
@@ -2194,6 +2666,273 @@ renameGroupBtn.addEventListener("click", () => {
   manageGroupNameInput.value = "";
   renderDiscoveredEndpoints();
   manageEndpointStatus.textContent = `Group renamed from "${fromGroup}" to "${toGroup}".`;
+});
+
+const hideEndpointContextMenu = () => {
+  endpointContextMenu.classList.add("hidden");
+  contextMenuEndpointId = null;
+};
+
+testEndpointsList.addEventListener("contextmenu", (event) => {
+  const target = event.target as HTMLElement;
+  const endpointEl = target.closest("[data-endpoint-id]") as HTMLElement | null;
+  if (!endpointEl) return;
+  const endpointId = endpointEl.dataset.endpointId;
+  if (!endpointId) return;
+  event.preventDefault();
+  contextMenuEndpointId = endpointId;
+  endpointContextMenu.classList.remove("hidden");
+  endpointContextMenu.style.left = `${event.clientX}px`;
+  endpointContextMenu.style.top = `${event.clientY}px`;
+});
+
+testResultsList.addEventListener("contextmenu", (event) => {
+  const target = event.target as HTMLElement;
+  const endpointEl = target.closest("[data-endpoint-id]") as HTMLElement | null;
+  if (!endpointEl) return;
+  const endpointId = endpointEl.dataset.endpointId;
+  if (!endpointId) return;
+  event.preventDefault();
+  contextMenuEndpointId = endpointId;
+  endpointContextMenu.classList.remove("hidden");
+  endpointContextMenu.style.left = `${event.clientX}px`;
+  endpointContextMenu.style.top = `${event.clientY}px`;
+});
+
+testEndpointsList.addEventListener("change", (event) => {
+  const target = event.target as HTMLElement;
+  const checkbox = target.closest("input[data-endpoint-select-id]") as HTMLInputElement | null;
+  if (!checkbox) return;
+  const endpointId = checkbox.dataset.endpointSelectId;
+  if (!endpointId) return;
+  if (checkbox.checked) {
+    selectedTestEndpointIds.add(endpointId);
+  } else {
+    selectedTestEndpointIds.delete(endpointId);
+  }
+  syncSelectAllState();
+});
+
+testSelectAllInput.addEventListener("change", () => {
+  if (testSelectAllInput.checked) {
+    discoveredEndpoints.forEach((endpoint) => selectedTestEndpointIds.add(endpoint.id));
+  } else {
+    selectedTestEndpointIds.clear();
+  }
+  renderTestEndpointsList();
+});
+
+runEndpointTestingBtn.addEventListener("click", async () => {
+  const selectedIds = discoveredEndpoints.filter((endpoint) => selectedTestEndpointIds.has(endpoint.id)).map((endpoint) => endpoint.id);
+  if (selectedIds.length === 0) {
+    endpointTestingStatus.textContent = "Select at least one endpoint to start testing.";
+    return;
+  }
+  await runAutomatedEndpointTesting(selectedIds);
+});
+
+document.addEventListener("click", (event) => {
+  const target = event.target as HTMLElement;
+  if (target.closest("#endpointContextMenu")) return;
+  hideEndpointContextMenu();
+});
+
+window.addEventListener("blur", () => {
+  hideEndpointContextMenu();
+});
+
+sendToRepeaterMenuItem.addEventListener("click", () => {
+  if (!contextMenuEndpointId) return;
+  const endpoint = discoveredEndpoints.find((item) => item.id === contextMenuEndpointId);
+  hideEndpointContextMenu();
+  if (!endpoint) return;
+  addEndpointToRepeater(endpoint);
+  setActivePage("repeater");
+});
+
+useCurrentSiteDomainBtn.addEventListener("click", async () => {
+  const inspected = await getCurrentInspectedUrl();
+  if (!inspected) return;
+  try {
+    secretDomainInput.value = new URL(inspected).hostname.toLowerCase();
+  } catch {}
+});
+
+secretsList.addEventListener("click", (event) => {
+  const target = event.target as HTMLElement;
+  const button = target.closest("button[data-secret-action]") as HTMLButtonElement | null;
+  if (!button) return;
+  const id = button.dataset.secretId;
+  if (!id) return;
+  const secret = secretEntries.find((item) => item.id === id);
+  if (!secret) return;
+
+  if (button.dataset.secretAction === "delete") {
+    secretEntries = secretEntries.filter((item) => item.id !== id);
+    if (editingSecretId === id) {
+      resetSecretForm();
+    }
+    saveWorkspaceSecrets(currentWorkspaceId);
+    renderSecretsList();
+    renderWorkspaceAnalytics();
+    secretsStatus.textContent = "Secret deleted.";
+    return;
+  }
+
+  editingSecretId = id;
+  secretDomainInput.value = secret.domainPattern;
+  secretKeyInput.value = secret.key;
+  secretValueInput.value = secret.value;
+  secretPlacementInput.value = secret.placement;
+  secretEnabledInput.checked = secret.enabled;
+  saveSecretBtn.textContent = "Update Secret";
+  secretsStatus.textContent = "Editing selected secret.";
+});
+
+saveSecretBtn.addEventListener("click", () => {
+  const domainPattern = normalizeDomainPattern(secretDomainInput.value);
+  const key = secretKeyInput.value.trim();
+  const value = secretValueInput.value;
+  const placement: SecretPlacement = secretPlacementInput.value === "query" ? "query" : "header";
+  const enabled = secretEnabledInput.checked;
+
+  if (!domainPattern || !key || !value) {
+    secretsStatus.textContent = "Domain, key, and value are required.";
+    return;
+  }
+
+  if (editingSecretId) {
+    secretEntries = secretEntries.map((secret) =>
+      secret.id === editingSecretId ? { ...secret, domainPattern, key, value, placement, enabled } : secret
+    );
+    secretsStatus.textContent = "Secret updated.";
+  } else {
+    const duplicate = secretEntries.find(
+      (secret) =>
+        secret.domainPattern === domainPattern && secret.key.toLowerCase() === key.toLowerCase() && secret.placement === placement
+    );
+    if (duplicate) {
+      secretEntries = secretEntries.map((secret) =>
+        secret.id === duplicate.id ? { ...secret, value, enabled } : secret
+      );
+      secretsStatus.textContent = "Existing secret updated.";
+    } else {
+      secretEntries.push({
+        id: crypto.randomUUID(),
+        domainPattern,
+        key,
+        value,
+        placement,
+        enabled
+      });
+      secretsStatus.textContent = "Secret added.";
+    }
+  }
+
+  saveWorkspaceSecrets(currentWorkspaceId);
+  resetSecretForm();
+  renderSecretsList();
+  renderWorkspaceAnalytics();
+});
+
+cancelSecretEditBtn.addEventListener("click", () => {
+  resetSecretForm();
+  secretsStatus.textContent = "Secret edit canceled.";
+});
+
+const syncActiveRepeaterFromInputs = () => {
+  const active = getActiveRepeaterEntry();
+  if (!active) return;
+  const methodCandidate = repeaterMethodInput.value.toUpperCase() as HttpMethod;
+  active.method = METHOD_SET.has(methodCandidate) ? methodCandidate : "GET";
+  active.url = repeaterUrlInput.value.trim();
+  active.headers = repeaterHeadersInput.value;
+  active.body = repeaterBodyInput.value;
+};
+
+repeaterMethodInput.addEventListener("change", syncActiveRepeaterFromInputs);
+repeaterUrlInput.addEventListener("input", syncActiveRepeaterFromInputs);
+repeaterHeadersInput.addEventListener("input", syncActiveRepeaterFromInputs);
+repeaterBodyInput.addEventListener("input", syncActiveRepeaterFromInputs);
+
+repeaterTabs.addEventListener("click", (event) => {
+  const target = event.target as HTMLElement;
+  const closeEl = target.closest("[data-repeater-close-id]") as HTMLElement | null;
+  if (closeEl) {
+    const closeId = closeEl.dataset.repeaterCloseId;
+    if (!closeId) return;
+    repeaterEntries = repeaterEntries.filter((entry) => entry.id !== closeId);
+    if (activeRepeaterEntryId === closeId) {
+      activeRepeaterEntryId = repeaterEntries[0]?.id ?? null;
+      repeaterResponseMeta.textContent = "";
+      repeaterResponseHeaders.textContent = "";
+      repeaterResponseBody.textContent = "";
+    }
+    renderRepeater();
+    return;
+  }
+
+  const tabEl = target.closest("[data-repeater-tab-id]") as HTMLElement | null;
+  if (!tabEl) return;
+  const tabId = tabEl.dataset.repeaterTabId;
+  if (!tabId) return;
+  syncActiveRepeaterFromInputs();
+  activeRepeaterEntryId = tabId;
+  renderRepeater();
+});
+
+repeaterSendBtn.addEventListener("click", async () => {
+  const active = getActiveRepeaterEntry();
+  if (!active) return;
+  syncActiveRepeaterFromInputs();
+
+  if (!active.url) {
+    repeaterResponseMeta.textContent = "Request URL is required.";
+    return;
+  }
+
+  repeaterResponseMeta.textContent = "Sending...";
+  repeaterResponseHeaders.textContent = "";
+  repeaterResponseBody.textContent = "";
+
+  try {
+    const headers = parseHeaders(active.headers);
+    const { res, elapsed, headersObj, text } = await executeRequest(active.method, active.url, headers, active.body);
+    repeaterResponseMeta.textContent = `${res.status} ${res.statusText} in ${elapsed.toFixed(0)}ms`;
+    repeaterResponseHeaders.textContent = JSON.stringify(headersObj, null, 2);
+    try {
+      repeaterResponseBody.textContent = JSON.stringify(JSON.parse(text), null, 2);
+    } catch {
+      repeaterResponseBody.textContent = text;
+    }
+
+    const matchedEndpoint = discoveredEndpoints.find(
+      (endpoint) => endpoint.method === active.method && endpoint.url === active.url
+    );
+    if (matchedEndpoint) {
+      endpointLastRequestBodies.set(matchedEndpoint.id, active.body);
+      endpointLastRequestHeaders.set(matchedEndpoint.id, active.headers);
+      const summary = await requestEndpointTestAnalysis(
+        matchedEndpoint,
+        active.body,
+        res.status,
+        headersObj,
+        text
+      );
+      endpointTestResults.set(matchedEndpoint.id, {
+        endpointId: matchedEndpoint.id,
+        status: res.status,
+        elapsedMs: elapsed,
+        summary
+      });
+      renderTestEndpointsList();
+      renderTestResultsList();
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    repeaterResponseMeta.textContent = "Request failed";
+    repeaterResponseBody.textContent = message;
+  }
 });
 
 startSiteTestingBtn.addEventListener("click", async () => {
@@ -2366,6 +3105,15 @@ clearWorkspaceBtn.addEventListener("click", async () => {
   clearWorkspaceData(currentWorkspaceId);
   state = defaultAppState();
   discoveredEndpoints = [];
+  selectedTestEndpointIds.clear();
+  endpointTestResults.clear();
+  endpointLastRequestBodies.clear();
+  endpointLastRequestHeaders.clear();
+  secretEntries = [];
+  renderSecretsList();
+  repeaterEntries = [];
+  activeRepeaterEntryId = null;
+  renderRepeater();
   editingDiscoveredEndpointId = null;
   const setup = defaultWorkspaceSetup();
   siteBaseUrlInput.value = setup.siteBaseUrl;
@@ -2385,6 +3133,9 @@ addDiscoveredRoutesBtn.addEventListener("click", () => {
 });
 
 renderDiscoveredEndpoints();
+renderRepeater();
+renderSecretsList();
+resetSecretForm();
 resetManagedEndpointForm();
 syncAuthModeInputs();
 authModeSelect.addEventListener("change", syncAuthModeInputs);
