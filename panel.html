@@ -9,34 +9,125 @@
   <body>
     <header class="toolbar">
       <strong>TestX</strong>
-      <label>
-        Type
-        <select id="typeFilter">
-          <option value="all">All</option>
-          <option value="network">Network</option>
-          <option value="console">Console</option>
-          <option value="storage">Storage</option>
-        </select>
-      </label>
-      <input id="searchInput" type="search" placeholder="Search URL, args, keys..." />
       <button id="themeToggle" type="button" aria-label="Switch to dark mode" title="Switch to dark mode">
-        <span id="themeIcon" aria-hidden="true">💡</span>
+        <span id="themeIcon" aria-hidden="true">&#128161;</span>
       </button>
-      <button id="snapshotBtn">Refresh Storage</button>
-      <button id="exportBtn">Export JSON</button>
     </header>
-    <main>
-      <div id="count"></div>
-      <table>
-        <thead>
-          <tr>
-            <th>Time</th>
-            <th>Type</th>
-            <th>Details</th>
-          </tr>
-        </thead>
-        <tbody id="rows"></tbody>
-      </table>
+    <main class="layout">
+      <aside class="sidebar">
+        <section class="panel-card">
+          <h3>New Group</h3>
+          <div class="inline">
+            <input id="groupNameInput" type="text" placeholder="Group name" />
+            <button id="addGroupBtn" type="button">Add</button>
+          </div>
+        </section>
+
+        <section class="panel-card">
+          <h3>New Route</h3>
+          <div class="stack">
+            <input id="routeNameInput" type="text" placeholder="Route name" />
+            <select id="routeMethodInput">
+              <option>GET</option>
+              <option>POST</option>
+              <option>PUT</option>
+              <option>PATCH</option>
+              <option>DELETE</option>
+              <option>HEAD</option>
+              <option>OPTIONS</option>
+            </select>
+            <input id="routeUrlInput" type="url" placeholder="https://api.example.com/items" />
+            <select id="routeGroupSelect"></select>
+            <button id="addRouteBtn" type="button">Add Route</button>
+          </div>
+        </section>
+
+        <section class="panel-card">
+          <h3>Import Swagger/OpenAPI</h3>
+          <div class="stack">
+            <input id="swaggerUrlInput" type="url" placeholder="https://api.example.com/openapi.json" />
+            <button id="importSwaggerUrlBtn" type="button">Import from URL</button>
+            <textarea id="swaggerSpecInput" rows="6" placeholder="Paste OpenAPI/Swagger JSON or YAML"></textarea>
+            <button id="importSwaggerTextBtn" type="button">Import from Text</button>
+            <div id="importStatus" class="helper-text"></div>
+          </div>
+        </section>
+
+        <section class="panel-card">
+          <h3>AI Automations</h3>
+          <div class="stack">
+            <input id="aiEndpointInput" type="url" placeholder="LLM endpoint (OpenAI-compatible)" />
+            <input id="aiModelInput" type="text" placeholder="Model (e.g. gpt-4o-mini)" />
+            <input id="aiApiKeyInput" type="password" placeholder="LLM API key" />
+            <textarea id="aiPromptInput" rows="4" placeholder="Describe the workflow to automate"></textarea>
+            <div class="inline">
+              <button id="saveAiSettingsBtn" type="button">Save AI Settings</button>
+              <button id="planAiWorkflowBtn" type="button">Generate Workflow</button>
+            </div>
+            <button id="runAiWorkflowBtn" type="button">Run Workflow</button>
+            <div id="aiStatus" class="helper-text"></div>
+            <pre id="aiWorkflowPreview" class="compact-pre"></pre>
+          </div>
+        </section>
+
+        <section class="panel-card tree-wrap">
+          <h3>Routes</h3>
+          <div id="routeTree" class="route-tree"></div>
+        </section>
+      </aside>
+
+      <section class="workspace">
+        <div id="emptyState" class="empty-state">Select a route from sidebar to start testing.</div>
+        <div id="tester" class="tester hidden">
+          <div class="workspace-head">
+            <input id="selectedRouteName" type="text" />
+            <div class="inline">
+              <button id="saveRouteBtn" type="button">Save</button>
+              <button id="deleteRouteBtn" type="button">Delete</button>
+            </div>
+          </div>
+          <div class="grid">
+            <label>
+              Method
+              <select id="selectedRouteMethod">
+                <option>GET</option>
+                <option>POST</option>
+                <option>PUT</option>
+                <option>PATCH</option>
+                <option>DELETE</option>
+                <option>HEAD</option>
+                <option>OPTIONS</option>
+              </select>
+            </label>
+            <label>
+              Group
+              <select id="selectedRouteGroup"></select>
+            </label>
+          </div>
+          <label>
+            URL
+            <input id="selectedRouteUrl" type="url" placeholder="https://api.example.com/items" />
+          </label>
+          <label>
+            Headers (JSON or key:value per line)
+            <textarea id="selectedRouteHeaders" rows="5" placeholder="{&quot;Authorization&quot;: &quot;Bearer ...&quot;}"></textarea>
+          </label>
+          <label>
+            Body
+            <textarea id="selectedRouteBody" rows="8" placeholder="{&quot;name&quot;: &quot;Sample&quot;}"></textarea>
+          </label>
+          <div class="inline">
+            <button id="sendRequestBtn" type="button">Send Request</button>
+            <span id="responseMeta"></span>
+          </div>
+          <div class="response-wrap">
+            <h4>Response Headers</h4>
+            <pre id="responseHeaders"></pre>
+            <h4>Response Body</h4>
+            <pre id="responseBody"></pre>
+          </div>
+        </div>
+      </section>
     </main>
     <script type="module" src="./src/devtools/panel.ts"></script>
   </body>
