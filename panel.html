@@ -27,8 +27,14 @@
         <button class="nav-item" type="button" data-page="discovery">
           <span class="nav-icon" aria-hidden="true">&#128269;</span><span>Discovery</span>
         </button>
+        <button class="nav-item" type="button" data-page="proxy">
+          <span class="nav-icon" aria-hidden="true">&#128246;</span><span>Proxy</span>
+        </button>
         <button class="nav-item" type="button" data-page="test-endpoints">
           <span class="nav-icon" aria-hidden="true">&#129514;</span><span>Test Endpoints</span>
+        </button>
+        <button class="nav-item" type="button" data-page="request-headers">
+          <span class="nav-icon" aria-hidden="true">&#128221;</span><span>Request Headers</span>
         </button>
         <button class="nav-item" type="button" data-page="test-results">
           <span class="nav-icon" aria-hidden="true">&#128202;</span><span>Test Results</span>
@@ -93,8 +99,18 @@
                 <input id="passiveDiscoveryEnabledInput" type="checkbox" />
                 <span>Enable passive auto-discovery from runtime network traffic</span>
               </label>
+              <div class="helper-text">Passive: API-focused capture with less noise.</div>
               <button id="startSiteTestingBtn" type="button">Start Testing (AI Discover Endpoints)</button>
               <div id="siteStatus" class="helper-text"></div>
+              <div class="workspace-clear-section">
+                <h4>Proxy Configuration</h4>
+                <label class="check-row">
+                  <input id="proxyDiscoveryEnabledInput" type="checkbox" />
+                  <span>Enable Proxy Mode (discover endpoints from all runtime requests while you navigate)</span>
+                </label>
+                <div class="helper-text">Proxy: maximum coverage, can include non-API noise.</div>
+                <div class="helper-text">No AI needed. Walk through the app and endpoints will be collected automatically.</div>
+              </div>
               <div class="workspace-clear-section">
                 <h4>Credential-Assisted Discovery</h4>
                 <select id="authModeSelect">
@@ -138,12 +154,66 @@
           </section>
         </section>
 
+        <section class="page" data-page="proxy">
+          <section class="panel-card page-card">
+            <h3>Proxy Traffic</h3>
+            <div class="stack">
+              <div class="proxy-tabbar">
+                <button id="proxyHttpTabBtn" type="button" class="proxy-tab is-active">HTTP</button>
+                <button id="proxyWebSocketTabBtn" type="button" class="proxy-tab">WebSocket</button>
+                <button id="clearProxyTrafficBtn" type="button">Clear Traffic</button>
+              </div>
+              <div class="helper-text">Proxy Mode: Enabled</div>
+              <div id="proxyTrafficStatus" class="helper-text"></div>
+              <div class="proxy-main-grid">
+                <section class="proxy-list-pane">
+                  <div class="proxy-table-head">
+                    <span>Date / Time</span>
+                    <span>Method</span>
+                    <span>URL</span>
+                    <span>Path</span>
+                    <span class="proxy-col-center">Param</span>
+                    <span class="proxy-col-center">Status</span>
+                    <span class="proxy-col-center">Response Time</span>
+                  </div>
+                  <div id="proxyTrafficList" class="proxy-table-list"></div>
+                </section>
+                <section class="proxy-detail-pane">
+                  <div id="proxyDetailGrid" class="proxy-detail-grid">
+                    <section id="proxyRequestCol" class="proxy-detail-col">
+                      <h4>Request</h4>
+                      <pre id="proxyRequestBody"></pre>
+                    </section>
+                    <section id="proxyResponseCol" class="proxy-detail-col">
+                      <h4>Response</h4>
+                      <pre id="proxyResponseBody"></pre>
+                    </section>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </section>
+        </section>
+
         <section class="page" data-page="test-results">
           <section class="panel-card page-card">
             <h3>Test Results</h3>
             <div class="stack">
               <div class="helper-text">Automated test outcomes for discovered endpoints.</div>
               <div id="testResultsList" class="endpoint-list"></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="page" data-page="request-headers">
+          <section class="panel-card page-card">
+            <h3>Request Header Configuration</h3>
+            <div class="stack">
+              <div class="helper-text">
+                AI-style suggestions are prefilled per endpoint. Review and edit headers before running tests.
+              </div>
+              <div id="requestHeadersStatus" class="helper-text"></div>
+              <div id="requestHeadersList" class="endpoint-list"></div>
             </div>
           </section>
         </section>

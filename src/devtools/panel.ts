@@ -1,4 +1,72 @@
-import { load as loadYaml } from "js-yaml";
+import {
+  AI_PROVIDER_PRESETS,
+  METHOD_SET,
+  defaultAppState,
+  defaultWorkspaceSetup,
+  type AiProvider,
+  type ApiGroup,
+  type ApiRoute,
+  type AppState,
+  type AuthMode,
+  type DiscoveredEndpoint,
+  type EndpointTestResult,
+  type HttpMethod,
+  type ImportedRoute,
+  type RepeaterEntry,
+  type Theme,
+  type WorkflowPlan,
+  type WorkflowStep,
+  type WorkspaceItem,
+  type WorkspaceSetup
+} from "./features/core/domain";
+import {
+  ACTIVE_WORKSPACE_KEY,
+  AI_SESSION_KEY,
+  THEME_KEY,
+  clearPersistentApiKey,
+  clearWorkspaceRequestHeaders,
+  clearWorkspaceSecrets,
+  createWorkspaceItem,
+  getPersistentApiKey,
+  initializeWorkspaces,
+  readAiSettings,
+  readWorkspaceDiscoveredEndpoints,
+  readWorkspaceRequestHeaders,
+  readWorkspaceSecrets,
+  readWorkspaceSetup,
+  readWorkspaceState,
+  saveAiSettings as persistAiSettings,
+  saveWorkspaceDiscoveredEndpoints,
+  saveWorkspaceRequestHeaders,
+  saveWorkspaceSecrets,
+  saveWorkspaceSetup,
+  saveWorkspaceState,
+  saveWorkspaces,
+  setPersistentApiKey
+} from "./features/core/storage";
+import {
+  detectBaseUrl,
+  discoverLinksFromHtml,
+  extractHeuristicEndpointsFromCandidates,
+  getEndpointConfigKey,
+  getSuggestedHeadersForEndpoint,
+  getSuggestedHeadersText,
+  inferGroupFromEndpointUrl,
+  isLikelyApiRequest,
+  joinUrl,
+  isWebSocketUrl,
+  normalizeBaseSiteUrl,
+  normalizeDiscoveredGroup,
+  normalizeHeaders,
+  parseHeaders,
+  parseSpecText,
+  prioritizeCandidates,
+  redactText,
+  sanitizeDiscoveredUrl,
+  sanitizeUrlForAi
+} from "./features/core/helpers";
+import { callAiForJson } from "./features/ai/client";
+import { createSecretsFeature } from "./features/secrets/controller";
 
 const groupNameInput = document.querySelector<HTMLInputElement>("#groupNameInput");
 const addGroupBtn = document.querySelector<HTMLButtonElement>("#addGroupBtn");
@@ -23,6 +91,7 @@ const workspaceAnalytics = document.querySelector<HTMLDivElement>("#workspaceAna
 const siteBaseUrlInput = document.querySelector<HTMLInputElement>("#siteBaseUrlInput");
 const siteMaxPagesInput = document.querySelector<HTMLInputElement>("#siteMaxPagesInput");
 const passiveDiscoveryEnabledInput = document.querySelector<HTMLInputElement>("#passiveDiscoveryEnabledInput");
+const proxyDiscoveryEnabledInput = document.querySelector<HTMLInputElement>("#proxyDiscoveryEnabledInput");
 const startSiteTestingBtn = document.querySelector<HTMLButtonElement>("#startSiteTestingBtn");
 const authModeSelect = document.querySelector<HTMLSelectElement>("#authModeSelect");
 const authEmailInput = document.querySelector<HTMLInputElement>("#authEmailInput");
@@ -38,7 +107,21 @@ const addDiscoveredRoutesBtn = document.querySelector<HTMLButtonElement>("#addDi
 const testSelectAllInput = document.querySelector<HTMLInputElement>("#testSelectAllInput");
 const runEndpointTestingBtn = document.querySelector<HTMLButtonElement>("#runEndpointTestingBtn");
 const endpointTestingStatus = document.querySelector<HTMLDivElement>("#endpointTestingStatus");
+const requestHeadersStatus = document.querySelector<HTMLDivElement>("#requestHeadersStatus");
+const requestHeadersList = document.querySelector<HTMLDivElement>("#requestHeadersList");
 const siteStatus = document.querySelector<HTMLDivElement>("#siteStatus");
+const proxyTrafficStatus = document.querySelector<HTMLDivElement>("#proxyTrafficStatus");
+const proxyTrafficList = document.querySelector<HTMLDivElement>("#proxyTrafficList");
+const proxyTrafficHead = document.querySelector<HTMLDivElement>(".proxy-table-head");
+const proxyDetailPane = document.querySelector<HTMLElement>(".proxy-detail-pane");
+const clearProxyTrafficBtn = document.querySelector<HTMLButtonElement>("#clearProxyTrafficBtn");
+const proxyHttpTabBtn = document.querySelector<HTMLButtonElement>("#proxyHttpTabBtn");
+const proxyWebSocketTabBtn = document.querySelector<HTMLButtonElement>("#proxyWebSocketTabBtn");
+const proxyRequestBody = document.querySelector<HTMLPreElement>("#proxyRequestBody");
+const proxyResponseBody = document.querySelector<HTMLPreElement>("#proxyResponseBody");
+const proxyDetailGrid = document.querySelector<HTMLDivElement>("#proxyDetailGrid");
+const proxyRequestCol = document.querySelector<HTMLElement>("#proxyRequestCol");
+const proxyResponseCol = document.querySelector<HTMLElement>("#proxyResponseCol");
 const testEndpointsList = document.querySelector<HTMLDivElement>("#testEndpointsList");
 const testResultsList = document.querySelector<HTMLDivElement>("#testResultsList");
 const manageEndpointsList = document.querySelector<HTMLDivElement>("#manageEndpointsList");
@@ -144,6 +227,7 @@ if (
   !siteBaseUrlInput ||
   !siteMaxPagesInput ||
   !passiveDiscoveryEnabledInput ||
+  !proxyDiscoveryEnabledInput ||
   !startSiteTestingBtn ||
   !authModeSelect ||
   !authEmailInput ||
@@ -159,7 +243,21 @@ if (
   !testSelectAllInput ||
   !runEndpointTestingBtn ||
   !endpointTestingStatus ||
+  !requestHeadersStatus ||
+  !requestHeadersList ||
   !siteStatus ||
+  !proxyTrafficStatus ||
+  !proxyTrafficList ||
+  !proxyTrafficHead ||
+  !proxyDetailPane ||
+  !clearProxyTrafficBtn ||
+  !proxyHttpTabBtn ||
+  !proxyWebSocketTabBtn ||
+  !proxyRequestBody ||
+  !proxyResponseBody ||
+  !proxyDetailGrid ||
+  !proxyRequestCol ||
+  !proxyResponseCol ||
   !testEndpointsList ||
   !testResultsList ||
   !manageEndpointsList ||
@@ -241,356 +339,20 @@ if (
   throw new Error("Panel DOM failed to initialize.");
 }
 
-type Theme = "light" | "dark";
-type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
-type AiProvider = "openai" | "anthropic" | "groq" | "custom";
-type AuthMode = "signin" | "signup";
-
-interface ApiGroup {
-  id: string;
-  name: string;
-}
-
-interface ApiRoute {
-  id: string;
-  name: string;
-  method: HttpMethod;
-  url: string;
-  groupId: string | null;
-  headers: string;
-  body: string;
-}
-
-interface AppState {
-  groups: ApiGroup[];
-  routes: ApiRoute[];
-  selectedRouteId: string | null;
-}
-
-interface ImportedRoute {
-  name: string;
-  method: HttpMethod;
-  url: string;
-  groupName: string | null;
-}
-
-interface AiSettings {
-  provider: AiProvider;
-  endpoint: string;
-  model: string;
-  rememberKeyInSession: boolean;
-  oneTimeKeyMode: boolean;
-  allowUnsafeEndpoint: boolean;
-  autoClearMinutes: number;
-  privacyMode: boolean;
-  allowSensitiveContext: boolean;
-}
-
-interface WorkflowStep {
-  name?: string;
-  routeId?: string;
-  routeName?: string;
-  method?: HttpMethod;
-  url?: string;
-  headers?: Record<string, string> | string;
-  body?: unknown;
-  assertStatus?: number | number[];
-}
-
-interface WorkflowPlan {
-  goal?: string;
-  steps: WorkflowStep[];
-}
-
-interface DiscoveredEndpoint {
-  id: string;
-  url: string;
-  method: HttpMethod;
-  group: string;
-  confidence?: number;
-  reason?: string;
-}
-
-interface RepeaterEntry {
-  id: string;
-  name: string;
-  method: HttpMethod;
-  url: string;
-  headers: string;
-  body: string;
-}
-
-type SecretPlacement = "header" | "query";
-
-interface SecretEntry {
-  id: string;
-  domainPattern: string;
-  key: string;
-  value: string;
-  placement: SecretPlacement;
-  enabled: boolean;
-}
-
-interface EndpointTestResult {
-  endpointId: string;
-  status?: number;
-  elapsedMs?: number;
-  summary: string;
-  error?: string;
-}
-
-interface WorkspaceItem {
-  id: string;
-  name: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface WorkspaceSetup {
-  siteBaseUrl: string;
-  siteMaxPages: number;
-  passiveDiscoveryEnabled: boolean;
-}
-
-const LEGACY_APP_STATE_KEY = "testx-api-state-v1";
-const THEME_KEY = "testx-theme";
-const AI_SETTINGS_KEY = "testx-ai-settings-v1";
-const AI_SESSION_KEY = "testx-ai-session-key";
-const AI_PERSISTENT_KEY = "testx-ai-persistent-key-v1";
-const LEGACY_DISCOVERED_ENDPOINTS_KEY = "testx-discovered-endpoints-v1";
-const WORKSPACES_KEY = "testx-workspaces-v1";
-const ACTIVE_WORKSPACE_KEY = "testx-active-workspace-v1";
-const DEFAULT_WORKSPACE_NAME = "Default Workspace";
-const SECRETS_KEY_PREFIX = "testx-workspace-";
-
-const ALLOWED_METHODS: HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
-const METHOD_SET = new Set(ALLOWED_METHODS);
-const AI_PROVIDER_PRESETS: Record<Exclude<AiProvider, "custom">, { endpoint: string; model: string }> = {
-  openai: { endpoint: "https://api.openai.com/v1/chat/completions", model: "gpt-4o-mini" },
-  anthropic: { endpoint: "https://api.anthropic.com/v1/messages", model: "claude-3-5-haiku-latest" },
-  groq: { endpoint: "https://api.groq.com/openai/v1/chat/completions", model: "llama-3.3-70b-versatile" }
-};
-
-const defaultAppState = (): AppState => ({ groups: [], routes: [], selectedRouteId: null });
-
-const workspaceStateKey = (workspaceId: string) => `testx-workspace-${workspaceId}-state-v1`;
-const workspaceDiscoveredKey = (workspaceId: string) => `testx-workspace-${workspaceId}-discovered-v1`;
-const workspaceSetupKey = (workspaceId: string) => `testx-workspace-${workspaceId}-setup-v1`;
-const workspaceSecretsKey = (workspaceId: string) => `${SECRETS_KEY_PREFIX}${workspaceId}-secrets-v1`;
-
-const parseStateRaw = (raw: string | null): AppState => {
-  if (!raw) return defaultAppState();
-  try {
-    const parsed = JSON.parse(raw) as Partial<AppState>;
-    return {
-      groups: Array.isArray(parsed.groups) ? parsed.groups : [],
-      routes: Array.isArray(parsed.routes) ? parsed.routes : [],
-      selectedRouteId: typeof parsed.selectedRouteId === "string" ? parsed.selectedRouteId : null
-    };
-  } catch {
-    return defaultAppState();
-  }
-};
-
-const normalizeStoredGroup = (value: string): string => {
-  const trimmed = value.trim();
-  return trimmed || "General";
-};
-
-const parseDiscoveredRaw = (raw: string | null): DiscoveredEndpoint[] => {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    const unique = new Map<string, DiscoveredEndpoint>();
-    parsed.forEach((item) => {
-      if (!item || typeof item !== "object") return;
-      const endpoint = item as Partial<DiscoveredEndpoint>;
-      const url = typeof endpoint.url === "string" ? endpoint.url.trim() : "";
-      if (!url) return;
-      const methodCandidate = typeof endpoint.method === "string" ? endpoint.method.toUpperCase() : "GET";
-      const method = METHOD_SET.has(methodCandidate as HttpMethod) ? (methodCandidate as HttpMethod) : "GET";
-      const group = normalizeStoredGroup(typeof endpoint.group === "string" ? endpoint.group : "General");
-      const key = `${method} ${url}`;
-      unique.set(key, {
-        id: typeof endpoint.id === "string" && endpoint.id ? endpoint.id : crypto.randomUUID(),
-        url,
-        method,
-        group,
-        confidence:
-          typeof endpoint.confidence === "number" && Number.isFinite(endpoint.confidence)
-            ? Math.max(0, Math.min(1, endpoint.confidence))
-            : undefined,
-        reason: typeof endpoint.reason === "string" ? endpoint.reason : undefined
-      });
-    });
-    return Array.from(unique.values());
-  } catch {
-    return [];
-  }
-};
-
-const readWorkspaces = (): WorkspaceItem[] => {
-  const raw = localStorage.getItem(WORKSPACES_KEY);
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter((item) => item && typeof item === "object")
-      .map((item) => {
-        const ws = item as Partial<WorkspaceItem>;
-        return {
-          id: typeof ws.id === "string" && ws.id ? ws.id : crypto.randomUUID(),
-          name: typeof ws.name === "string" && ws.name.trim() ? ws.name.trim() : "Workspace",
-          createdAt: typeof ws.createdAt === "string" ? ws.createdAt : new Date().toISOString(),
-          updatedAt: typeof ws.updatedAt === "string" ? ws.updatedAt : new Date().toISOString()
-        };
-      });
-  } catch {
-    return [];
-  }
-};
-
-const saveWorkspaces = (items: WorkspaceItem[]) => {
-  localStorage.setItem(WORKSPACES_KEY, JSON.stringify(items));
-};
-
-const createWorkspaceItem = (name: string): WorkspaceItem => {
-  const now = new Date().toISOString();
-  return { id: crypto.randomUUID(), name: name.trim(), createdAt: now, updatedAt: now };
-};
-
-const defaultWorkspaceSetup = (): WorkspaceSetup => ({
-  siteBaseUrl: "",
-  siteMaxPages: 6,
-  passiveDiscoveryEnabled: false
-});
-
-const readWorkspaceSetup = (workspaceId: string): WorkspaceSetup => {
-  const raw = localStorage.getItem(workspaceSetupKey(workspaceId));
-  if (!raw) return defaultWorkspaceSetup();
-  try {
-    const parsed = JSON.parse(raw) as Partial<WorkspaceSetup>;
-    return {
-      siteBaseUrl: typeof parsed.siteBaseUrl === "string" ? parsed.siteBaseUrl : "",
-      siteMaxPages:
-        typeof parsed.siteMaxPages === "number" && Number.isFinite(parsed.siteMaxPages)
-          ? Math.max(1, Math.min(30, Math.floor(parsed.siteMaxPages)))
-          : 6,
-      passiveDiscoveryEnabled: parsed.passiveDiscoveryEnabled === true
-    };
-  } catch {
-    return defaultWorkspaceSetup();
-  }
-};
-
-const saveWorkspaceSetup = (workspaceId: string, setup: WorkspaceSetup) => {
-  localStorage.setItem(workspaceSetupKey(workspaceId), JSON.stringify(setup));
-};
-
-const normalizeDomainPattern = (raw: string): string => {
-  const value = raw.trim().toLowerCase();
-  if (!value) return "";
-  if (value === "*") return "*";
-  if (value.startsWith("http://") || value.startsWith("https://")) {
-    try {
-      return new URL(value).hostname.toLowerCase();
-    } catch {
-      return "";
-    }
-  }
-  return value.replace(/^(\*\.)?www\./, (m) => (m.startsWith("*.") ? "*." : ""));
-};
-
-const readWorkspaceSecrets = (workspaceId: string): SecretEntry[] => {
-  const raw = localStorage.getItem(workspaceSecretsKey(workspaceId));
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter((item) => item && typeof item === "object")
-      .map((item) => {
-        const secret = item as Partial<SecretEntry>;
-        const domainPattern = normalizeDomainPattern(typeof secret.domainPattern === "string" ? secret.domainPattern : "");
-        const placement = secret.placement === "query" ? "query" : "header";
-        return {
-          id: typeof secret.id === "string" && secret.id ? secret.id : crypto.randomUUID(),
-          domainPattern,
-          key: typeof secret.key === "string" ? secret.key.trim() : "",
-          value: typeof secret.value === "string" ? secret.value : "",
-          placement,
-          enabled: secret.enabled !== false
-        };
-      })
-      .filter((item) => Boolean(item.domainPattern && item.key && item.value));
-  } catch {
-    return [];
-  }
-};
-
-const saveWorkspaceSecrets = (workspaceId: string) => {
-  localStorage.setItem(workspaceSecretsKey(workspaceId), JSON.stringify(secretEntries));
-};
-
-const clearWorkspaceSecrets = (workspaceId: string) => {
-  localStorage.setItem(workspaceSecretsKey(workspaceId), JSON.stringify([]));
-};
-
-const initializeWorkspaces = (): { items: WorkspaceItem[]; activeId: string } => {
-  let items = readWorkspaces();
-  if (items.length === 0 || !items.some((item) => item.name.toLowerCase() === DEFAULT_WORKSPACE_NAME.toLowerCase())) {
-    const defaultWorkspace = createWorkspaceItem(DEFAULT_WORKSPACE_NAME);
-    items = [defaultWorkspace, ...items];
-    saveWorkspaces(items);
-  }
-
-  const defaultWorkspace = items.find(
-    (item) => item.name.toLowerCase() === DEFAULT_WORKSPACE_NAME.toLowerCase()
-  )!;
-  const activeId = defaultWorkspace.id;
-  localStorage.setItem(ACTIVE_WORKSPACE_KEY, activeId);
-
-  const scopedStateKey = workspaceStateKey(activeId);
-  const scopedDiscoveredKey = workspaceDiscoveredKey(activeId);
-  let migratedLegacy = false;
-  if (!localStorage.getItem(scopedStateKey)) {
-    const legacyStateRaw = localStorage.getItem(LEGACY_APP_STATE_KEY);
-    if (legacyStateRaw) {
-      localStorage.setItem(scopedStateKey, legacyStateRaw);
-      migratedLegacy = true;
-    }
-  }
-  if (!localStorage.getItem(scopedDiscoveredKey)) {
-    const legacyDiscoveredRaw = localStorage.getItem(LEGACY_DISCOVERED_ENDPOINTS_KEY);
-    if (legacyDiscoveredRaw) {
-      localStorage.setItem(scopedDiscoveredKey, legacyDiscoveredRaw);
-      migratedLegacy = true;
-    }
-  }
-  if (migratedLegacy) {
-    localStorage.removeItem(LEGACY_APP_STATE_KEY);
-    localStorage.removeItem(LEGACY_DISCOVERED_ENDPOINTS_KEY);
-  }
-
-  return { items, activeId };
-};
-
 const workspaceBoot = initializeWorkspaces();
 let workspaces: WorkspaceItem[] = workspaceBoot.items;
 let currentWorkspaceId = workspaceBoot.activeId;
 
 const readState = (): AppState => {
-  return parseStateRaw(localStorage.getItem(workspaceStateKey(currentWorkspaceId)));
+  return readWorkspaceState(currentWorkspaceId);
 };
 
 const readDiscoveredEndpoints = (): DiscoveredEndpoint[] => {
-  return parseDiscoveredRaw(localStorage.getItem(workspaceDiscoveredKey(currentWorkspaceId)));
+  return readWorkspaceDiscoveredEndpoints(currentWorkspaceId);
 };
 
 const saveDiscoveredEndpoints = () => {
-  localStorage.setItem(workspaceDiscoveredKey(currentWorkspaceId), JSON.stringify(discoveredEndpoints));
+  saveWorkspaceDiscoveredEndpoints(currentWorkspaceId, discoveredEndpoints);
 };
 
 let state: AppState = readState();
@@ -609,80 +371,317 @@ let runtimeDiscoveryPauseUntil = 0;
 let repeaterEntries: RepeaterEntry[] = [];
 let activeRepeaterEntryId: string | null = null;
 let contextMenuEndpointId: string | null = null;
-let secretEntries: SecretEntry[] = [];
-let editingSecretId: string | null = null;
+let requestHeadersByEndpoint: Record<string, string> = readWorkspaceRequestHeaders(currentWorkspaceId);
 const selectedTestEndpointIds = new Set<string>();
 const endpointTestResults = new Map<string, EndpointTestResult>();
 const endpointLastRequestBodies = new Map<string, string>();
 const endpointLastRequestHeaders = new Map<string, string>();
+const MAX_PROXY_TRAFFIC_ENTRIES = 500;
+const PROXY_TRAFFIC_PAGE_SIZE = 80;
+const PROXY_COLUMN_MIN_WIDTH = 64;
+const PROXY_COLUMN_MAX_WIDTH = 900;
+const PROXY_DETAIL_MIN_WIDTH = 220;
+const PROXY_COLUMN_KEYS = ["datetime", "method", "url", "path", "param", "status", "time"] as const;
+type ProxyColumnKey = (typeof PROXY_COLUMN_KEYS)[number];
+const proxyColumnWidths: Record<ProxyColumnKey, number> = {
+  datetime: 150,
+  method: 70,
+  url: 260,
+  path: 160,
+  param: 70,
+  status: 70,
+  time: 90
+};
 
-const readAiSettings = (): AiSettings => {
-  const raw = localStorage.getItem(AI_SETTINGS_KEY);
-  if (!raw) {
-    return {
-      provider: "openai",
-      endpoint: "https://api.openai.com/v1/chat/completions",
-      model: "gpt-4o-mini",
-      rememberKeyInSession: false,
-      oneTimeKeyMode: false,
-      allowUnsafeEndpoint: false,
-      autoClearMinutes: 15,
-      privacyMode: true,
-      allowSensitiveContext: false
+interface ProxyTrafficEntry {
+  id: string;
+  ts: number;
+  type: "http" | "websocket";
+  method: string;
+  url: string;
+  path: string;
+  hasQuery: boolean;
+  status: number;
+  statusText: string;
+  mimeType: string;
+  durationMs: number;
+  requestHttpVersion: string;
+  requestHeaders: string;
+  requestBody: string;
+  responseHttpVersion: string;
+  responseHeaders: string;
+  responseBody: string;
+}
+
+let proxyTrafficEntries: ProxyTrafficEntry[] = [];
+let activeProxyTrafficTab: "http" | "websocket" = "http";
+let selectedProxyTrafficId: string | null = null;
+let proxyViewLimitByTab: Record<"http" | "websocket", number> = {
+  http: PROXY_TRAFFIC_PAGE_SIZE,
+  websocket: PROXY_TRAFFIC_PAGE_SIZE
+};
+
+const applyProxyColumnWidths = () => {
+  let minWidth = 0;
+  PROXY_COLUMN_KEYS.forEach((key) => {
+    const width = Math.max(PROXY_COLUMN_MIN_WIDTH, Math.min(PROXY_COLUMN_MAX_WIDTH, proxyColumnWidths[key]));
+    proxyColumnWidths[key] = width;
+    document.documentElement.style.setProperty(`--proxy-col-${key}`, `${width}px`);
+    minWidth += width;
+  });
+  document.documentElement.style.setProperty("--proxy-table-min-width", `${minWidth + 48}px`);
+};
+
+const syncProxyHeaderWithListScrollbar = () => {
+  const scrollbarWidth = Math.max(0, proxyTrafficList.offsetWidth - proxyTrafficList.clientWidth);
+  proxyTrafficHead.style.setProperty("--proxy-list-scrollbar-width", `${scrollbarWidth}px`);
+};
+
+const formatProxyDateTime = (ts: number): string => {
+  if (!Number.isFinite(ts) || ts <= 0) return "-";
+  const dt = new Date(ts);
+  const year = dt.getFullYear();
+  const month = String(dt.getMonth() + 1).padStart(2, "0");
+  const day = String(dt.getDate()).padStart(2, "0");
+  const hours = String(dt.getHours()).padStart(2, "0");
+  const minutes = String(dt.getMinutes()).padStart(2, "0");
+  const seconds = String(dt.getSeconds()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+};
+
+const setupProxyColumnResize = () => {
+  const edgeThreshold = 8;
+  const headerCells = Array.from(proxyTrafficHead.querySelectorAll<HTMLElement>("span"));
+  if (headerCells.length !== PROXY_COLUMN_KEYS.length) return;
+
+  const getBorderIndexes = (event: MouseEvent): { left: number; right: number } | null => {
+    const target = (event.target as HTMLElement).closest<HTMLElement>("span");
+    if (!target) return null;
+    const index = headerCells.indexOf(target);
+    if (index < 0) return null;
+    const rect = target.getBoundingClientRect();
+    const distLeft = event.clientX - rect.left;
+    const distRight = rect.right - event.clientX;
+    if (distLeft <= edgeThreshold && index > 0) return { left: index - 1, right: index };
+    if (distRight <= edgeThreshold && index < headerCells.length - 1) return { left: index, right: index + 1 };
+    return null;
+  };
+
+  const onMouseMove = (event: MouseEvent) => {
+    proxyTrafficHead.style.cursor = getBorderIndexes(event) ? "col-resize" : "";
+  };
+
+  const onMouseLeave = () => {
+    proxyTrafficHead.style.cursor = "";
+  };
+
+  proxyTrafficHead.addEventListener("mousemove", onMouseMove);
+  proxyTrafficHead.addEventListener("mouseleave", onMouseLeave);
+
+  proxyTrafficHead.addEventListener("mousedown", (event) => {
+    if (event.button !== 0) return;
+    const border = getBorderIndexes(event);
+    if (!border) return;
+    event.preventDefault();
+    const leftKey = PROXY_COLUMN_KEYS[border.left];
+    const rightKey = PROXY_COLUMN_KEYS[border.right];
+    const startLeftWidth = proxyColumnWidths[leftKey];
+    const startRightWidth = proxyColumnWidths[rightKey];
+    const startX = event.clientX;
+
+    const onDrag = (moveEvent: MouseEvent) => {
+      const delta = moveEvent.clientX - startX;
+      let nextLeft = Math.max(
+        PROXY_COLUMN_MIN_WIDTH,
+        Math.min(PROXY_COLUMN_MAX_WIDTH, startLeftWidth + delta)
+      );
+      const appliedDelta = nextLeft - startLeftWidth;
+      let nextRight = Math.max(
+        PROXY_COLUMN_MIN_WIDTH,
+        Math.min(PROXY_COLUMN_MAX_WIDTH, startRightWidth - appliedDelta)
+      );
+      const correctedDelta = startRightWidth - nextRight;
+      nextLeft = Math.max(
+        PROXY_COLUMN_MIN_WIDTH,
+        Math.min(PROXY_COLUMN_MAX_WIDTH, startLeftWidth + correctedDelta)
+      );
+      proxyColumnWidths[leftKey] = nextLeft;
+      proxyColumnWidths[rightKey] = nextRight;
+      applyProxyColumnWidths();
     };
+
+    const onStop = () => {
+      window.removeEventListener("mousemove", onDrag);
+      window.removeEventListener("mouseup", onStop);
+    };
+
+    window.addEventListener("mousemove", onDrag);
+    window.addEventListener("mouseup", onStop);
+  });
+};
+
+const setupProxyDetailResize = () => {
+  const edgeThreshold = 8;
+
+  const canResizeAtViewport = (): boolean => window.innerWidth > 920;
+
+  const nearSharedBorder = (event: MouseEvent): boolean => {
+    if (!canResizeAtViewport()) return false;
+    const reqRect = proxyRequestCol.getBoundingClientRect();
+    const resRect = proxyResponseCol.getBoundingClientRect();
+    const nearReqRight =
+      Math.abs(event.clientX - reqRect.right) <= edgeThreshold &&
+      event.clientY >= reqRect.top &&
+      event.clientY <= reqRect.bottom;
+    const nearResLeft =
+      Math.abs(event.clientX - resRect.left) <= edgeThreshold &&
+      event.clientY >= resRect.top &&
+      event.clientY <= resRect.bottom;
+    return nearReqRight || nearResLeft;
+  };
+
+  proxyDetailGrid.addEventListener("mousemove", (event) => {
+    proxyDetailGrid.style.cursor = nearSharedBorder(event) ? "col-resize" : "";
+  });
+
+  proxyDetailGrid.addEventListener("mouseleave", () => {
+    proxyDetailGrid.style.cursor = "";
+  });
+
+  proxyDetailGrid.addEventListener("mousedown", (event) => {
+    if (event.button !== 0) return;
+    if (!nearSharedBorder(event)) return;
+    event.preventDefault();
+
+    const startX = event.clientX;
+    const startReqWidth = proxyRequestCol.getBoundingClientRect().width;
+    const startResWidth = proxyResponseCol.getBoundingClientRect().width;
+    const totalWidth = startReqWidth + startResWidth;
+    const maxReqWidth = Math.max(PROXY_DETAIL_MIN_WIDTH, totalWidth - PROXY_DETAIL_MIN_WIDTH);
+
+    const onDrag = (moveEvent: MouseEvent) => {
+      const delta = moveEvent.clientX - startX;
+      const nextReqWidth = Math.max(
+        PROXY_DETAIL_MIN_WIDTH,
+        Math.min(maxReqWidth, startReqWidth + delta)
+      );
+      const nextResWidth = Math.max(PROXY_DETAIL_MIN_WIDTH, totalWidth - nextReqWidth);
+      proxyDetailGrid.style.setProperty("--proxy-detail-request-width", `${nextReqWidth}px`);
+      proxyDetailGrid.style.setProperty("--proxy-detail-response-width", `${nextResWidth}px`);
+    };
+
+    const onStop = () => {
+      window.removeEventListener("mousemove", onDrag);
+      window.removeEventListener("mouseup", onStop);
+    };
+
+    window.addEventListener("mousemove", onDrag);
+    window.addEventListener("mouseup", onStop);
+  });
+};
+
+
+const resolveStatusText = (status: number, rawStatusText: string): string => {
+  if (rawStatusText.trim()) return rawStatusText.trim();
+  if (!Number.isFinite(status) || status <= 0) return "";
+  const known: Record<number, string> = {
+    100: "Continue",
+    101: "Switching Protocols",
+    102: "Processing",
+    103: "Early Hints",
+    200: "OK",
+    201: "Created",
+    202: "Accepted",
+    203: "Non-Authoritative Information",
+    204: "No Content",
+    205: "Reset Content",
+    206: "Partial Content",
+    207: "Multi-Status",
+    208: "Already Reported",
+    226: "IM Used",
+    300: "Multiple Choices",
+    301: "Moved Permanently",
+    302: "Found",
+    303: "See Other",
+    304: "Not Modified",
+    305: "Use Proxy",
+    307: "Temporary Redirect",
+    308: "Permanent Redirect",
+    400: "Bad Request",
+    401: "Unauthorized",
+    402: "Payment Required",
+    403: "Forbidden",
+    404: "Not Found",
+    405: "Method Not Allowed",
+    406: "Not Acceptable",
+    407: "Proxy Authentication Required",
+    408: "Request Timeout",
+    409: "Conflict",
+    410: "Gone",
+    411: "Length Required",
+    412: "Precondition Failed",
+    413: "Payload Too Large",
+    414: "URI Too Long",
+    415: "Unsupported Media Type",
+    416: "Range Not Satisfiable",
+    417: "Expectation Failed",
+    418: "I'm a Teapot",
+    421: "Misdirected Request",
+    422: "Unprocessable Entity",
+    423: "Locked",
+    424: "Failed Dependency",
+    425: "Too Early",
+    426: "Upgrade Required",
+    428: "Precondition Required",
+    429: "Too Many Requests",
+    431: "Request Header Fields Too Large",
+    451: "Unavailable For Legal Reasons",
+    500: "Internal Server Error",
+    501: "Not Implemented",
+    502: "Bad Gateway",
+    503: "Service Unavailable",
+    504: "Gateway Timeout",
+    505: "HTTP Version Not Supported",
+    506: "Variant Also Negotiates",
+    507: "Insufficient Storage",
+    508: "Loop Detected",
+    510: "Not Extended",
+    511: "Network Authentication Required"
+  };
+  return known[status] ?? "";
+};
+
+const resolveProxyDurationMs = (entry: chrome.devtools.network.Request): number => {
+  if (typeof entry?.time === "number" && Number.isFinite(entry.time) && entry.time >= 0) {
+    return entry.time;
   }
 
-  try {
-    const parsed = JSON.parse(raw) as Partial<AiSettings>;
-    const provider =
-      parsed.provider === "openai" ||
-      parsed.provider === "anthropic" ||
-      parsed.provider === "groq" ||
-      parsed.provider === "custom"
-        ? parsed.provider
-        : "openai";
-    const defaultPreset = provider === "custom" ? AI_PROVIDER_PRESETS.openai : AI_PROVIDER_PRESETS[provider];
-    return {
-      provider,
-      endpoint:
-        typeof parsed.endpoint === "string" && parsed.endpoint.trim()
-          ? parsed.endpoint
-          : defaultPreset.endpoint,
-      model:
-        typeof parsed.model === "string" && parsed.model.trim() ? parsed.model : defaultPreset.model,
-      rememberKeyInSession: parsed.rememberKeyInSession === true,
-      oneTimeKeyMode: parsed.oneTimeKeyMode === true,
-      allowUnsafeEndpoint: parsed.allowUnsafeEndpoint === true,
-      autoClearMinutes:
-        typeof parsed.autoClearMinutes === "number" && Number.isFinite(parsed.autoClearMinutes)
-          ? Math.max(1, Math.floor(parsed.autoClearMinutes))
-          : 15,
-      privacyMode: parsed.privacyMode !== false,
-      allowSensitiveContext: parsed.allowSensitiveContext === true
-    };
-  } catch {
-    return {
-      provider: "openai",
-      endpoint: "https://api.openai.com/v1/chat/completions",
-      model: "gpt-4o-mini",
-      rememberKeyInSession: false,
-      oneTimeKeyMode: false,
-      allowUnsafeEndpoint: false,
-      autoClearMinutes: 15,
-      privacyMode: true,
-      allowSensitiveContext: false
-    };
+  const timings = entry?.timings;
+  if (timings && typeof timings === "object") {
+    const phaseKeys = ["blocked", "dns", "connect", "send", "wait", "receive", "ssl"] as const;
+    const summed = phaseKeys.reduce((total, key) => {
+      const value = (timings as Record<string, unknown>)[key];
+      return total + (typeof value === "number" && value > 0 ? value : 0);
+    }, 0);
+    if (summed > 0) return summed;
   }
+
+  const startedAt =
+    typeof entry?.startedDateTime === "string" ? new Date(entry.startedDateTime).getTime() : NaN;
+  if (Number.isFinite(startedAt)) {
+    return Math.max(0, Date.now() - startedAt);
+  }
+  return 0;
 };
 
 let aiSettings = readAiSettings();
 
 const saveState = () => {
-  localStorage.setItem(workspaceStateKey(currentWorkspaceId), JSON.stringify(state));
+  saveWorkspaceState(currentWorkspaceId, state);
 };
 
 const saveAiSettings = () => {
-  localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(aiSettings));
+  persistAiSettings(aiSettings);
 };
 
 const isSessionStorageAvailable = (): boolean =>
@@ -714,38 +713,6 @@ const clearSessionApiKey = async (): Promise<void> => {
   await new Promise<void>((resolve) => {
     chrome.storage.session.remove([AI_SESSION_KEY], () => resolve());
   });
-};
-
-const getPersistentApiKey = (): string => {
-  const value = localStorage.getItem(AI_PERSISTENT_KEY);
-  return typeof value === "string" ? value : "";
-};
-
-const setPersistentApiKey = (key: string) => {
-  localStorage.setItem(AI_PERSISTENT_KEY, key);
-};
-
-const clearPersistentApiKey = () => {
-  localStorage.removeItem(AI_PERSISTENT_KEY);
-};
-
-const PROVIDER_HOST_ALLOWLIST: Record<Exclude<AiProvider, "custom">, string[]> = {
-  openai: ["api.openai.com"],
-  anthropic: ["api.anthropic.com"],
-  groq: ["api.groq.com"]
-};
-
-const isEndpointAllowed = (provider: AiProvider, endpoint: string, allowUnsafe: boolean): boolean => {
-  try {
-    const url = new URL(endpoint);
-    if (url.protocol !== "https:") return false;
-    if (allowUnsafe) return true;
-    if (provider === "custom") return false;
-    const allowedHosts = PROVIDER_HOST_ALLOWLIST[provider];
-    return allowedHosts.includes(url.hostname.toLowerCase());
-  } catch {
-    return false;
-  }
 };
 
 const clearApiKeyNow = async (message?: string) => {
@@ -784,6 +751,29 @@ const getCurrentInspectedUrl = async (): Promise<string> =>
       resolve("");
     });
   });
+
+const secretsFeature = createSecretsFeature({
+  initialSecrets: readWorkspaceSecrets(currentWorkspaceId),
+  elements: {
+    secretDomainInput,
+    useCurrentSiteDomainBtn,
+    secretKeyInput,
+    secretValueInput,
+    secretPlacementInput,
+    secretEnabledInput,
+    saveSecretBtn,
+    cancelSecretEditBtn,
+    secretsStatus,
+    secretsList
+  },
+  getCurrentInspectedUrl,
+  persistSecrets: (secrets) => {
+    saveWorkspaceSecrets(currentWorkspaceId, secrets);
+  },
+  onSecretsChanged: () => {
+    renderWorkspaceAnalytics();
+  }
+});
 
 const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => {
@@ -841,15 +831,11 @@ const getInitialTheme = (): Theme => {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 };
 
-const normalizeBaseSiteUrl = (raw: string): string => {
-  const parsed = new URL(raw);
-  return parsed.origin;
-};
-
 const getWorkspaceSetupFromInputs = (): WorkspaceSetup => ({
   siteBaseUrl: siteBaseUrlInput.value.trim(),
   siteMaxPages: Math.max(1, Math.min(30, Number.parseInt(siteMaxPagesInput.value || "6", 10) || 6)),
-  passiveDiscoveryEnabled: passiveDiscoveryEnabledInput.checked
+  passiveDiscoveryEnabled: passiveDiscoveryEnabledInput.checked,
+  proxyDiscoveryEnabled: proxyDiscoveryEnabledInput.checked
 });
 
 const touchWorkspaceUpdatedAt = (workspaceId: string) => {
@@ -864,6 +850,7 @@ const saveWorkspaceSnapshot = () => {
   saveState();
   saveDiscoveredEndpoints();
   saveWorkspaceSetup(currentWorkspaceId, getWorkspaceSetupFromInputs());
+  saveWorkspaceRequestHeaders(currentWorkspaceId, requestHeadersByEndpoint);
   touchWorkspaceUpdatedAt(currentWorkspaceId);
   renderWorkspaceAnalytics();
 };
@@ -878,9 +865,9 @@ const renderWorkspaceAnalytics = () => {
     `Groups: ${state.groups.length}`,
     `Routes: ${state.routes.length}`,
     `Discovered: ${discoveredEndpoints.length}`,
-    `Secrets: ${secretEntries.length}`,
-    `Site: ${setup.siteBaseUrl || "Not set"}`,
-    `Passive: ${setup.passiveDiscoveryEnabled ? "On" : "Off"}`
+    `Secrets: ${secretsFeature.getSecrets().length}`,
+    `Passive: ${setup.passiveDiscoveryEnabled ? "On" : "Off"}`,
+    `Proxy: ${setup.proxyDiscoveryEnabled ? "On" : "Off"}`
   ];
   workspaceAnalytics.textContent = lines.join(" | ");
 };
@@ -907,29 +894,34 @@ const loadWorkspaceIntoPanel = (workspaceId: string) => {
   endpointLastRequestBodies.clear();
   endpointLastRequestHeaders.clear();
   const setup = readWorkspaceSetup(workspaceId);
-  secretEntries = readWorkspaceSecrets(workspaceId);
-  editingSecretId = null;
+  secretsFeature.setSecrets(readWorkspaceSecrets(workspaceId));
+  requestHeadersByEndpoint = readWorkspaceRequestHeaders(workspaceId);
   siteBaseUrlInput.value = setup.siteBaseUrl || "";
   siteMaxPagesInput.value = String(setup.siteMaxPages || 6);
   passiveDiscoveryEnabledInput.checked = setup.passiveDiscoveryEnabled;
+  proxyDiscoveryEnabledInput.checked = setup.proxyDiscoveryEnabled;
   editingDiscoveredEndpointId = null;
   currentWorkflow = null;
   aiWorkflowPreview.textContent = "";
   repeaterEntries = [];
   activeRepeaterEntryId = null;
+  proxyTrafficEntries = [];
+  selectedProxyTrafficId = null;
+  proxyViewLimitByTab = { http: PROXY_TRAFFIC_PAGE_SIZE, websocket: PROXY_TRAFFIC_PAGE_SIZE };
   hideEndpointContextMenu();
   renderRepeater();
+  renderProxyTraffic();
   renderWorkspaceOptions();
-  renderSecretsList();
   renderDiscoveredEndpoints();
   render();
 };
 
 const clearWorkspaceData = (workspaceId: string) => {
-  localStorage.setItem(workspaceStateKey(workspaceId), JSON.stringify(defaultAppState()));
-  localStorage.setItem(workspaceDiscoveredKey(workspaceId), JSON.stringify([]));
-  localStorage.setItem(workspaceSetupKey(workspaceId), JSON.stringify(defaultWorkspaceSetup()));
+  saveWorkspaceState(workspaceId, defaultAppState());
+  saveWorkspaceDiscoveredEndpoints(workspaceId, []);
+  saveWorkspaceSetup(workspaceId, defaultWorkspaceSetup());
   clearWorkspaceSecrets(workspaceId);
+  clearWorkspaceRequestHeaders(workspaceId);
 };
 
 const syncAuthModeInputs = () => {
@@ -1081,129 +1073,11 @@ const render = () => {
   renderWorkspaceAnalytics();
 };
 
-const parseHeaders = (raw: string): Record<string, string> => {
-  const value = raw.trim();
-  if (!value) return {};
-
-  if (value.startsWith("{")) {
-    const parsed = JSON.parse(value) as Record<string, unknown>;
-    const headers: Record<string, string> = {};
-    Object.entries(parsed).forEach(([key, headerValue]) => {
-      headers[key] = String(headerValue);
-    });
-    return headers;
-  }
-
-  const headers: Record<string, string> = {};
-  value
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .forEach((line) => {
-      const idx = line.indexOf(":");
-      if (idx <= 0) return;
-      const key = line.slice(0, idx).trim();
-      const headerValue = line.slice(idx + 1).trim();
-      headers[key] = headerValue;
-    });
-
-  return headers;
-};
-
-const normalizeHeaders = (headers: WorkflowStep["headers"]): Record<string, string> => {
-  if (!headers) return {};
-  if (typeof headers === "string") return parseHeaders(headers);
-  const out: Record<string, string> = {};
-  Object.entries(headers).forEach(([k, v]) => {
-    out[k] = String(v);
-  });
-  return out;
-};
-
-const extractJsonObject = (raw: string): string => {
-  const first = raw.indexOf("{");
-  const last = raw.lastIndexOf("}");
-  if (first === -1 || last === -1 || last <= first) {
-    throw new Error("AI did not return a JSON object.");
-  }
-  return raw.slice(first, last + 1);
-};
-
-const joinUrl = (base: string, path: string): string => {
-  if (!base) return path;
-  if (/^https?:\/\//i.test(path)) return path;
-  const left = base.endsWith("/") ? base.slice(0, -1) : base;
-  const right = path.startsWith("/") ? path : `/${path}`;
-  return `${left}${right}`;
-};
-
-const detectBaseUrl = (spec: Record<string, unknown>): string => {
-  const openApiServers = spec.servers as Array<{ url?: string }> | undefined;
-  if (Array.isArray(openApiServers) && openApiServers[0]?.url) {
-    return String(openApiServers[0].url);
-  }
-
-  const host = typeof spec.host === "string" ? spec.host : "";
-  const basePath = typeof spec.basePath === "string" ? spec.basePath : "";
-  const schemes = Array.isArray(spec.schemes) ? spec.schemes : [];
-  const scheme = typeof schemes[0] === "string" ? schemes[0] : "https";
-  if (host) {
-    return `${scheme}://${host}${basePath}`;
-  }
-
-  return "";
-};
-
-const parseSpecText = (raw: string): Record<string, unknown> => {
-  const text = raw.trim();
-  if (!text) throw new Error("Swagger/OpenAPI content is empty.");
-
-  try {
-    return JSON.parse(text) as Record<string, unknown>;
-  } catch {
-    const parsed = loadYaml(text);
-    if (!parsed || typeof parsed !== "object") {
-      throw new Error("Invalid Swagger/OpenAPI format.");
-    }
-    return parsed as Record<string, unknown>;
-  }
-};
-
-const normalizeDiscoveredGroup = (value: string): string => {
-  const trimmed = value.trim();
-  return trimmed || "General";
-};
-
-const inferGroupFromEndpointUrl = (url: string): string => {
-  const value = url.toLowerCase();
-  if (/(supabase|firebase|auth0|clerk|stripe|hasura|postgrest)/.test(value)) {
-    return "Integrations";
-  }
-  if (/(auth|login|logout|signup|signin|token|oauth|password|refresh)/.test(value)) {
-    return "Authentication";
-  }
-  if (/(user|users|profile|account|member|customer)/.test(value)) {
-    return "User Management";
-  }
-  if (/(role|permission|acl|admin)/.test(value)) {
-    return "Access Control";
-  }
-  if (/(order|cart|checkout|invoice|payment|billing|subscription)/.test(value)) {
-    return "Commerce & Billing";
-  }
-  if (/(product|catalog|item|inventory)/.test(value)) {
-    return "Catalog";
-  }
-  if (/(search|query|filter|suggest)/.test(value)) {
-    return "Search";
-  }
-  if (/(notify|notification|message|email|sms|webhook)/.test(value)) {
-    return "Notifications";
-  }
-  if (/(content|post|article|comment|media|upload|file)/.test(value)) {
-    return "Content";
-  }
-  return "General";
+const getResolvedHeadersText = (endpoint: DiscoveredEndpoint): string => {
+  const key = getEndpointConfigKey(endpoint.method, endpoint.url);
+  const saved = requestHeadersByEndpoint[key];
+  if (typeof saved === "string" && saved.trim()) return saved;
+  return getSuggestedHeadersText(endpoint);
 };
 
 const getDiscoveredGroupNames = (): string[] => {
@@ -1298,7 +1172,7 @@ const executeRequest = async (
   headersInput: Record<string, string>,
   bodyInput: string
 ) => {
-  const applied = applySecretsToRequest(url, headersInput);
+  const applied = secretsFeature.applySecretsToRequest(url, headersInput);
   const init: RequestInit = { method, headers: applied.headers };
   const allowsBody = !["GET", "DELETE", "HEAD", "OPTIONS"].includes(method);
   if (allowsBody && bodyInput.trim()) {
@@ -1317,24 +1191,6 @@ const executeRequest = async (
   return { res, elapsed, headersObj, text };
 };
 
-const redactText = (value: string): string =>
-  value
-    .replace(/(authorization\s*:\s*bearer\s+)[^\s"']+/gi, "$1[REDACTED]")
-    .replace(/(api[_-]?key|token|secret|password)\s*[:=]\s*([^\s,"']+)/gi, "$1=[REDACTED]");
-
-const sanitizeUrlForAi = (rawUrl: string): string => {
-  try {
-    const url = new URL(rawUrl);
-    url.username = "";
-    url.password = "";
-    Array.from(url.searchParams.keys()).forEach((key) => {
-      url.searchParams.set(key, "[REDACTED]");
-    });
-    return url.toString();
-  } catch {
-    return redactText(rawUrl);
-  }
-};
 
 const routeSummary = () =>
   state.routes.map((route) => {
@@ -1411,187 +1267,6 @@ const persistApiKeyMode = async () => {
   }
 };
 
-const ensureAiRequestAllowed = (): { apiKey: string; isAnthropic: boolean } => {
-  const apiKey = aiApiKeyMemory.trim();
-  if (!aiSettings.endpoint.trim() || !aiSettings.model.trim() || !apiKey) {
-    throw new Error("Fill AI endpoint, model, and API key first.");
-  }
-  if (!isEndpointAllowed(aiSettings.provider, aiSettings.endpoint, aiSettings.allowUnsafeEndpoint)) {
-    throw new Error(
-      "Endpoint blocked. Use HTTPS and a trusted provider endpoint, or enable unsafe endpoint override."
-    );
-  }
-  return { apiKey, isAnthropic: aiSettings.provider === "anthropic" };
-};
-
-const callAiForJson = async (systemPrompt: string, userPayload: Record<string, unknown>) => {
-  const { apiKey, isAnthropic } = ensureAiRequestAllowed();
-  const userContent = JSON.stringify(userPayload, null, 2);
-  const payload = isAnthropic
-    ? {
-        model: aiSettings.model,
-        max_tokens: 1400,
-        temperature: 0.2,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userContent }]
-      }
-    : {
-        model: aiSettings.model,
-        temperature: 0.2,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userContent }
-        ]
-      };
-
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (isAnthropic) {
-    headers["x-api-key"] = apiKey;
-    headers["anthropic-version"] = "2023-06-01";
-  } else {
-    headers.Authorization = `Bearer ${apiKey}`;
-  }
-
-  const response = await fetch(aiSettings.endpoint, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(payload)
-  });
-
-  if (!response.ok) {
-    throw new Error(`LLM call failed: ${response.status} ${response.statusText}`);
-  }
-
-  const data = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-    content?: Array<{ type?: string; text?: string }>;
-  };
-  const content = isAnthropic
-    ? data.content?.find((item) => item.type === "text")?.text
-    : data.choices?.[0]?.message?.content;
-  if (!content || typeof content !== "string") {
-    throw new Error("LLM response does not include message content.");
-  }
-
-  return JSON.parse(extractJsonObject(content)) as Record<string, unknown>;
-};
-
-const discoverLinksFromHtml = (html: string, baseUrl: string): { links: string[]; candidates: string[] } => {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, "text/html");
-  const links = new Set<string>();
-  const candidates = new Set<string>();
-
-  doc.querySelectorAll<HTMLAnchorElement>("a[href]").forEach((anchor) => {
-    try {
-      const normalized = new URL(anchor.href, baseUrl).toString();
-      links.add(normalized);
-    } catch {}
-  });
-
-  const candidateRegex =
-    /(https?:\/\/[^\s"'`<>]+|\/(?:api|v1|v2|v3|graphql|rest)[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=%]*)/gi;
-  const scriptText = Array.from(doc.querySelectorAll("script"))
-    .map((script) => script.textContent || "")
-    .join("\n");
-  const combined = `${html}\n${scriptText}`;
-  let match: RegExpExecArray | null;
-  while ((match = candidateRegex.exec(combined)) !== null) {
-    const raw = match[1];
-    try {
-      const normalized = raw.startsWith("http") ? new URL(raw).toString() : new URL(raw, baseUrl).toString();
-      candidates.add(normalized);
-    } catch {}
-  }
-
-  return { links: Array.from(links), candidates: Array.from(candidates) };
-};
-
-const scoreCandidateUrl = (rawUrl: string): number => {
-  const value = rawUrl.toLowerCase();
-  let score = 0;
-  if (/supabase\.co/.test(value)) score += 80;
-  if (/(api|graphql|rest\/v\d+|functions\/v\d+|auth\/v\d+|storage\/v\d+)/.test(value)) score += 50;
-  if (/(\/v1\/|\/v2\/|\/v3\/|\/rpc\/|\/edge\/|\/function)/.test(value)) score += 30;
-  if (/(firebase|hasura|stripe|auth0|clerk|postgrest)/.test(value)) score += 25;
-  if (/[?&](apikey|token|auth|project|anon)=/i.test(rawUrl)) score += 10;
-  if (/\.css($|\?)/.test(value) || /\.png($|\?)/.test(value) || /\.jpg($|\?)/.test(value)) score -= 40;
-  return score;
-};
-
-const prioritizeCandidates = (candidates: string[], limit: number): string[] =>
-  candidates
-    .slice()
-    .sort((a, b) => scoreCandidateUrl(b) - scoreCandidateUrl(a))
-    .slice(0, limit);
-
-const extractHeuristicEndpointsFromCandidates = (candidates: string[]): DiscoveredEndpoint[] => {
-  const out = new Map<string, DiscoveredEndpoint>();
-
-  candidates.forEach((rawUrl) => {
-    let parsed: URL;
-    try {
-      parsed = new URL(rawUrl);
-    } catch {
-      return;
-    }
-
-    const value = parsed.toString().toLowerCase();
-    const looksLikeApi =
-      /supabase\.co/.test(value) ||
-      /(\/api\/|\/graphql|\/rest\/v\d+|\/functions\/v\d+|\/auth\/v\d+|\/storage\/v\d+|\/rpc\/)/.test(value);
-    if (!looksLikeApi) return;
-
-    const method: HttpMethod = /\/rpc\/|\/auth\/v\d+\/token/.test(value) ? "POST" : "GET";
-    const group = normalizeDiscoveredGroup(inferGroupFromEndpointUrl(parsed.toString()));
-    const key = `${method} ${parsed.toString()}`;
-    if (out.has(key)) return;
-
-    out.set(key, {
-      id: crypto.randomUUID(),
-      url: parsed.toString(),
-      method,
-      group,
-      confidence: 0.65,
-      reason: "Heuristic discovery from runtime/crawl candidate URL."
-    });
-  });
-
-  return Array.from(out.values());
-};
-
-const sanitizeDiscoveredUrl = (rawUrl: string): string => {
-  try {
-    const parsed = new URL(rawUrl);
-    parsed.hash = "";
-    Array.from(parsed.searchParams.keys()).forEach((key) => {
-      if (/(api[_-]?key|token|secret|password|auth|signature|sig|jwt)/i.test(key)) {
-        parsed.searchParams.set(key, "[REDACTED]");
-      }
-    });
-    return parsed.toString();
-  } catch {
-    return rawUrl;
-  }
-};
-
-const isLikelyApiRequest = (url: string, method: HttpMethod, mimeType: string): boolean => {
-  const value = url.toLowerCase();
-  if (/(api|graphql|rest\/v\d+|auth\/v\d+|functions\/v\d+|storage\/v\d+|rpc\/|oauth|token|session|login|signup|register)/.test(value)) {
-    return true;
-  }
-  if (/(supabase\.co|firebase|hasura|postgrest|auth0|clerk|okta)/.test(value)) {
-    return true;
-  }
-  if (method !== "GET" && /(json|graphql|javascript)/i.test(mimeType)) {
-    return true;
-  }
-  if (method !== "GET" && /\/v\d+\//.test(value)) {
-    return true;
-  }
-  return false;
-};
-
 const mergeDiscoveredEndpoints = (items: DiscoveredEndpoint[]): number => {
   if (items.length === 0) return 0;
   const merged = new Map<string, DiscoveredEndpoint>();
@@ -1647,21 +1322,21 @@ const collectRuntimeApiHints = async (): Promise<string[]> =>
         performance.getEntriesByType("resource").forEach((entry) => {
           const name = entry && entry.name ? String(entry.name) : "";
           if (!name) return;
-          if (/api|graphql|rest\\/v\\d+|functions\\/v\\d+|auth\\/v\\d+|storage\\/v\\d+|supabase\\.co/i.test(name)) {
+          if (/api|graphql|rest\\/v\\d+|functions\\/v\\d+|auth\\/v\\d+|storage\\/v\\d+|supabase\\.co|websocket|socket\\.io|\\/socket|\\/ws\\/|\\/ws$|\\/realtime|^wss?:\\/\\//i.test(name)) {
             out.add(name);
           }
         });
       } catch {}
       try {
         const html = document.documentElement ? document.documentElement.outerHTML : "";
-        const regex = /(https?:\\/\\/[^\\s"'<>]+|\\/[a-zA-Z0-9\\-._~:/?#[\\]@!$&'()*+,;=%]+)/g;
+        const regex = /((?:https?|wss?):\\/\\/[^\\s"'<>]+|\\/[a-zA-Z0-9\\-._~:/?#[\\]@!$&'()*+,;=%]+)/g;
         let m;
         while ((m = regex.exec(html)) !== null) {
           const raw = m[1];
           if (!raw) continue;
-          if (/api|graphql|rest\\/v\\d+|functions\\/v\\d+|auth\\/v\\d+|storage\\/v\\d+|supabase\\.co/i.test(raw)) {
+          if (/api|graphql|rest\\/v\\d+|functions\\/v\\d+|auth\\/v\\d+|storage\\/v\\d+|supabase\\.co|websocket|socket\\.io|\\/socket|\\/ws\\/|\\/ws$|\\/realtime|^wss?:\\/\\//i.test(raw)) {
             try {
-              const full = raw.startsWith("http") ? new URL(raw).toString() : new URL(raw, window.location.origin).toString();
+              const full = /^(https?|wss?):/i.test(raw) ? new URL(raw).toString() : new URL(raw, window.location.origin).toString();
               out.add(full);
             } catch {}
           }
@@ -1953,7 +1628,7 @@ const requestAiWorkflow = async (userPrompt: string): Promise<WorkflowPlan> => {
     "You generate API testing workflows. Return only JSON object: {\"goal\":string,\"steps\":[{\"name\":string,\"routeId\":string,\"routeName\":string,\"method\":string,\"url\":string,\"headers\":object,\"body\":string|object,\"assertStatus\":number|number[]}]}. Use routeId or routeName whenever possible. Keep steps executable.";
 
   const prompt = aiSettings.privacyMode ? redactText(userPrompt) : userPrompt;
-  const parsed = (await callAiForJson(systemPrompt, {
+  const parsed = (await callAiForJson(aiSettings, aiApiKeyMemory, systemPrompt, {
     prompt,
     availableRoutes: routeSummary()
   })) as Partial<WorkflowPlan>;
@@ -2034,7 +1709,7 @@ const requestAiEndpointDiscovery = async (siteData: {
   const systemPrompt =
     "You are an API discovery assistant. Identify likely backend API endpoints from crawl/runtime signals and assign each to a feature group like Authentication, User Management, Billing, Orders, Content, Search, Notifications, Integrations, or General. Include first-party and third-party backend endpoints (for example Supabase project URLs) when they are clearly used by the app. Return only JSON object: {\"endpoints\":[{\"url\":string,\"method\":string,\"group\":string,\"confidence\":number,\"reason\":string}]}. Keep only plausible API endpoints and include absolute URLs.";
 
-  const parsed = await callAiForJson(systemPrompt, {
+  const parsed = await callAiForJson(aiSettings, aiApiKeyMemory, systemPrompt, {
     rootUrl: siteData.rootUrl,
     visitedPages: siteData.visitedPages,
     candidateUrls: siteData.candidates,
@@ -2094,6 +1769,7 @@ const addDiscoveredEndpointsToRoutes = () => {
   const existingKeys = new Set(state.routes.map((route) => `${route.method} ${route.url}`));
   let addedCount = 0;
   discoveredEndpoints.forEach((endpoint) => {
+    if (isWebSocketUrl(endpoint.url)) return;
     const methodCandidate = (endpoint.method || "GET").toUpperCase() as HttpMethod;
     const method = METHOD_SET.has(methodCandidate) ? methodCandidate : "GET";
     const discoveredGroupName = normalizeDiscoveredGroup(endpoint.group);
@@ -2174,8 +1850,6 @@ addRouteBtn.addEventListener("click", () => {
 
 const endpointCardHtml = (endpoint: DiscoveredEndpoint): string => {
   const checked = selectedTestEndpointIds.has(endpoint.id) ? "checked" : "";
-  const confidenceText =
-    typeof endpoint.confidence === "number" ? `${Math.round(endpoint.confidence * 100)}%` : "Unknown";
   const description = endpoint.reason?.trim() ? endpoint.reason.trim() : "No description";
   const result = endpointTestResults.get(endpoint.id);
   const resultText = result
@@ -2193,7 +1867,6 @@ const endpointCardHtml = (endpoint: DiscoveredEndpoint): string => {
       <span class="endpoint-url">${endpoint.url}</span>
     </div>
     <div class="helper-text">Group: ${endpoint.group}</div>
-    <div class="helper-text">Confidence: ${confidenceText}</div>
     <div class="helper-text">Description: ${description}</div>
     ${resultLine}
   </div>`;
@@ -2286,6 +1959,49 @@ const renderTestResultsList = () => {
     .join("");
 };
 
+const renderRequestHeadersList = () => {
+  const validKeys = new Set(discoveredEndpoints.map((endpoint) => getEndpointConfigKey(endpoint.method, endpoint.url)));
+  let pruned = false;
+  Object.keys(requestHeadersByEndpoint).forEach((key) => {
+    if (!validKeys.has(key)) {
+      delete requestHeadersByEndpoint[key];
+      pruned = true;
+    }
+  });
+  if (pruned) {
+    saveWorkspaceRequestHeaders(currentWorkspaceId, requestHeadersByEndpoint);
+  }
+
+  if (discoveredEndpoints.length === 0) {
+    requestHeadersStatus.textContent = "";
+    requestHeadersList.innerHTML = `<div class="helper-text">No discovered endpoints yet.</div>`;
+    return;
+  }
+
+  requestHeadersStatus.textContent =
+    "Suggestions are based on endpoint URL/method. Edit any value before automated testing.";
+
+  requestHeadersList.innerHTML = discoveredEndpoints
+    .map((endpoint) => {
+      const key = getEndpointConfigKey(endpoint.method, endpoint.url);
+      const value = getResolvedHeadersText(endpoint);
+      return `<div class="endpoint-item" data-endpoint-header-id="${endpoint.id}">
+        <div class="endpoint-item-head">
+          <span class="endpoint-method">${endpoint.method}</span>
+          <span class="endpoint-url">${endpoint.url}</span>
+        </div>
+        <label>
+          Request headers (JSON or key:value per line)
+          <textarea data-endpoint-header-key="${key}" rows="4">${value}</textarea>
+        </label>
+        <div class="inline">
+          <button type="button" data-endpoint-header-action="suggested" data-endpoint-header-key="${key}">Use Suggested</button>
+        </div>
+      </div>`;
+    })
+    .join("");
+};
+
 const resetManagedEndpointForm = () => {
   editingDiscoveredEndpointId = null;
   manageEndpointUrlInput.value = "";
@@ -2350,9 +2066,111 @@ const renderDiscoveredEndpoints = () => {
   saveDiscoveredEndpoints();
   renderTestEndpointsList();
   renderTestResultsList();
+  renderRequestHeadersList();
   renderManageEndpointsList();
   renderManageGroupOptions();
   renderWorkspaceAnalytics();
+};
+
+const renderProxyTraffic = () => {
+  const proxyOn = proxyDiscoveryEnabledInput.checked;
+  proxyHttpTabBtn.classList.toggle("is-active", activeProxyTrafficTab === "http");
+  proxyWebSocketTabBtn.classList.toggle("is-active", activeProxyTrafficTab === "websocket");
+
+  const filtered = proxyTrafficEntries
+    .filter((entry) => entry.type === activeProxyTrafficTab)
+    .slice()
+    .reverse();
+  const limit = proxyViewLimitByTab[activeProxyTrafficTab];
+  const visible = filtered.slice(0, limit);
+
+  if (!proxyOn) {
+    proxyTrafficStatus.textContent = "Proxy mode is off. Enable it in Discovery to trace traffic.";
+  } else {
+    const label = activeProxyTrafficTab === "websocket" ? "WebSocket Entries" : "HTTP Entries";
+    proxyTrafficStatus.textContent = `${label}: ${filtered.length}`;
+  }
+
+  if (!visible.some((entry) => entry.id === selectedProxyTrafficId)) {
+    selectedProxyTrafficId = visible[0]?.id ?? null;
+  }
+
+  if (visible.length === 0) {
+    proxyDetailPane.hidden = true;
+    proxyTrafficList.innerHTML = `<div class="helper-text">No ${
+      activeProxyTrafficTab === "http" ? "HTTP" : "WebSocket"
+    } traffic captured yet.</div>`;
+    proxyRequestBody.textContent = "";
+    proxyResponseBody.textContent = "";
+    return;
+  }
+  proxyDetailPane.hidden = false;
+
+  proxyTrafficList.innerHTML = visible
+    .map((entry) => {
+      const duration = Number.isFinite(entry.durationMs) ? `${entry.durationMs.toFixed(0)}ms` : "-";
+      const selectedClass = entry.id === selectedProxyTrafficId ? " is-selected" : "";
+      const paramIcon = entry.hasQuery ? "&#10003;" : "";
+      const statusCode = entry.status > 0 ? String(entry.status) : "";
+      const dateTime = formatProxyDateTime(entry.ts);
+      return `<button type="button" class="proxy-row${selectedClass}" data-proxy-entry-id="${entry.id}">
+        <span title="${dateTime}">${dateTime}</span>
+        <span>${entry.type === "websocket" ? "WS" : entry.method}</span>
+        <span title="${entry.url}">${entry.url}</span>
+        <span title="${entry.path}">${entry.path || "/"}</span>
+        <span class="proxy-col-center" title="${entry.hasQuery ? "Query params found" : ""}">${paramIcon}</span>
+        <span class="proxy-col-center">${statusCode}</span>
+        <span class="proxy-col-center">${duration}</span>
+      </button>`;
+    })
+    .join("");
+
+  const selected = visible.find((entry) => entry.id === selectedProxyTrafficId);
+  if (!selected) {
+    proxyRequestBody.textContent = "";
+    proxyResponseBody.textContent = "";
+    return;
+  }
+  const requestVersion = selected.requestHttpVersion || "HTTP/?";
+  const requestLines = [`${selected.method.toUpperCase()} ${selected.url} ${requestVersion}`];
+  if (selected.requestHeaders.trim()) {
+    requestLines.push(selected.requestHeaders.trim());
+  }
+  if (selected.requestBody) {
+    requestLines.push("", selected.requestBody);
+  }
+
+  const responseStatus = selected.status ? String(selected.status) : "-";
+  const statusText = selected.statusText ? ` ${selected.statusText}` : "";
+  const responseLines = [`${responseStatus}${statusText}`];
+  if (selected.responseHeaders.trim()) {
+    responseLines.push(selected.responseHeaders.trim());
+  }
+  if (selected.responseBody) {
+    responseLines.push("", selected.responseBody);
+  }
+
+  proxyRequestBody.textContent = requestLines.join("\n");
+  proxyResponseBody.textContent = responseLines.join("\n");
+  syncProxyHeaderWithListScrollbar();
+};
+
+const addProxyTrafficEntry = (entry: ProxyTrafficEntry) => {
+  proxyTrafficEntries.push(entry);
+  if (proxyTrafficEntries.length > MAX_PROXY_TRAFFIC_ENTRIES) {
+    proxyTrafficEntries = proxyTrafficEntries.slice(proxyTrafficEntries.length - MAX_PROXY_TRAFFIC_ENTRIES);
+  }
+  if (!selectedProxyTrafficId) {
+    selectedProxyTrafficId = entry.id;
+  }
+  renderProxyTraffic();
+};
+
+const updateProxyTrafficEntry = (id: string, patch: Partial<ProxyTrafficEntry>) => {
+  const index = proxyTrafficEntries.findIndex((entry) => entry.id === id);
+  if (index === -1) return;
+  proxyTrafficEntries[index] = { ...proxyTrafficEntries[index], ...patch };
+  renderProxyTraffic();
 };
 
 const requestEndpointTestAnalysis = async (
@@ -2364,6 +2182,8 @@ const requestEndpointTestAnalysis = async (
 ): Promise<string> => {
   try {
     const parsed = (await callAiForJson(
+      aiSettings,
+      aiApiKeyMemory,
       "You are an API test analyzer. Return only JSON object: {\"summary\":string}. Keep summary short and actionable.",
       {
         endpoint: { method: endpoint.method, url: endpoint.url, group: endpoint.group },
@@ -2404,12 +2224,29 @@ const runAutomatedEndpointTesting = async (endpointIds: string[]) => {
   for (const endpointId of endpointIds) {
     const endpoint = discoveredEndpoints.find((item) => item.id === endpointId);
     if (!endpoint) continue;
+    if (isWebSocketUrl(endpoint.url)) {
+      endpointTestResults.set(endpoint.id, {
+        endpointId: endpoint.id,
+        summary: "WebSocket endpoint discovered. HTTP automated testing is not applicable."
+      });
+      completed += 1;
+      endpointTestingStatus.textContent = `Tested ${completed}/${endpointIds.length} endpoint(s)...`;
+      renderTestEndpointsList();
+      renderTestResultsList();
+      continue;
+    }
     const requestBody = ["POST", "PUT", "PATCH"].includes(endpoint.method) ? "{}" : "";
-    const requestHeaders = "";
+    const requestHeaders = getResolvedHeadersText(endpoint);
+    const parsedRequestHeaders = parseHeaders(requestHeaders);
     endpointLastRequestBodies.set(endpoint.id, requestBody);
     endpointLastRequestHeaders.set(endpoint.id, requestHeaders);
     try {
-      const { res, elapsed, headersObj, text } = await executeRequest(endpoint.method, endpoint.url, {}, requestBody);
+      const { res, elapsed, headersObj, text } = await executeRequest(
+        endpoint.method,
+        endpoint.url,
+        parsedRequestHeaders,
+        requestBody
+      );
       const summary = await requestEndpointTestAnalysis(endpoint, requestBody, res.status, headersObj, text);
       endpointTestResults.set(endpoint.id, {
         endpointId: endpoint.id,
@@ -2476,79 +2313,6 @@ const renderRepeater = () => {
   repeaterUrlInput.value = active.url;
   repeaterHeadersInput.value = active.headers;
   repeaterBodyInput.value = active.body;
-};
-
-const secretMatchesHost = (pattern: string, host: string): boolean => {
-  if (pattern === "*") return true;
-  const normalizedPattern = normalizeDomainPattern(pattern);
-  const normalizedHost = host.toLowerCase();
-  if (normalizedPattern.startsWith("*.")) {
-    const suffix = normalizedPattern.slice(2);
-    return normalizedHost === suffix || normalizedHost.endsWith(`.${suffix}`);
-  }
-  return normalizedHost === normalizedPattern;
-};
-
-const applySecretsToRequest = (
-  url: string,
-  headersInput: Record<string, string>
-): { url: string; headers: Record<string, string> } => {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    return { url, headers: headersInput };
-  }
-
-  const headers = { ...headersInput };
-  const host = parsed.hostname.toLowerCase();
-  secretEntries
-    .filter((secret) => secret.enabled && secretMatchesHost(secret.domainPattern, host))
-    .forEach((secret) => {
-      if (secret.placement === "header") {
-        if (!(secret.key in headers)) {
-          headers[secret.key] = secret.value;
-        }
-      } else {
-        if (!parsed.searchParams.has(secret.key)) {
-          parsed.searchParams.set(secret.key, secret.value);
-        }
-      }
-    });
-
-  return { url: parsed.toString(), headers };
-};
-
-const resetSecretForm = () => {
-  editingSecretId = null;
-  secretDomainInput.value = "";
-  secretKeyInput.value = "";
-  secretValueInput.value = "";
-  secretPlacementInput.value = "header";
-  secretEnabledInput.checked = true;
-  saveSecretBtn.textContent = "Add Secret";
-};
-
-const renderSecretsList = () => {
-  if (secretEntries.length === 0) {
-    secretsList.innerHTML = `<div class="helper-text">No secrets configured.</div>`;
-    return;
-  }
-  secretsList.innerHTML = secretEntries
-    .map(
-      (secret) => `<div class="endpoint-item" data-secret-id="${secret.id}">
-    <div class="endpoint-item-head">
-      <span class="endpoint-method">${secret.placement.toUpperCase()}</span>
-      <span class="endpoint-url">${secret.domainPattern} :: ${secret.key}</span>
-    </div>
-    <div class="helper-text">Value: •••••••• | ${secret.enabled ? "Enabled" : "Disabled"}</div>
-    <div class="inline">
-      <button type="button" data-secret-action="edit" data-secret-id="${secret.id}">Edit</button>
-      <button type="button" data-secret-action="delete" data-secret-id="${secret.id}">Delete</button>
-    </div>
-  </div>`
-    )
-    .join("");
 };
 
 const addEndpointToRepeater = (endpoint: DiscoveredEndpoint) => {
@@ -2731,6 +2495,37 @@ runEndpointTestingBtn.addEventListener("click", async () => {
   await runAutomatedEndpointTesting(selectedIds);
 });
 
+requestHeadersList.addEventListener("input", (event) => {
+  const target = event.target as HTMLElement;
+  const textarea = target.closest("textarea[data-endpoint-header-key]") as HTMLTextAreaElement | null;
+  if (!textarea) return;
+  const key = textarea.dataset.endpointHeaderKey;
+  if (!key) return;
+  requestHeadersByEndpoint[key] = textarea.value;
+  saveWorkspaceRequestHeaders(currentWorkspaceId, requestHeadersByEndpoint);
+  touchWorkspaceUpdatedAt(currentWorkspaceId);
+  requestHeadersStatus.textContent = "Request header configuration updated.";
+  renderWorkspaceAnalytics();
+});
+
+requestHeadersList.addEventListener("click", (event) => {
+  const target = event.target as HTMLElement;
+  const button = target.closest("button[data-endpoint-header-action]") as HTMLButtonElement | null;
+  if (!button) return;
+  const key = button.dataset.endpointHeaderKey;
+  if (!key) return;
+  if (button.dataset.endpointHeaderAction !== "suggested") return;
+  const endpoint = discoveredEndpoints.find((item) => getEndpointConfigKey(item.method, item.url) === key);
+  if (!endpoint) return;
+  const suggested = getSuggestedHeadersText(endpoint);
+  requestHeadersByEndpoint[key] = suggested;
+  saveWorkspaceRequestHeaders(currentWorkspaceId, requestHeadersByEndpoint);
+  touchWorkspaceUpdatedAt(currentWorkspaceId);
+  requestHeadersStatus.textContent = "Suggested headers restored for endpoint.";
+  renderRequestHeadersList();
+  renderWorkspaceAnalytics();
+});
+
 document.addEventListener("click", (event) => {
   const target = event.target as HTMLElement;
   if (target.closest("#endpointContextMenu")) return;
@@ -2748,96 +2543,6 @@ sendToRepeaterMenuItem.addEventListener("click", () => {
   if (!endpoint) return;
   addEndpointToRepeater(endpoint);
   setActivePage("repeater");
-});
-
-useCurrentSiteDomainBtn.addEventListener("click", async () => {
-  const inspected = await getCurrentInspectedUrl();
-  if (!inspected) return;
-  try {
-    secretDomainInput.value = new URL(inspected).hostname.toLowerCase();
-  } catch {}
-});
-
-secretsList.addEventListener("click", (event) => {
-  const target = event.target as HTMLElement;
-  const button = target.closest("button[data-secret-action]") as HTMLButtonElement | null;
-  if (!button) return;
-  const id = button.dataset.secretId;
-  if (!id) return;
-  const secret = secretEntries.find((item) => item.id === id);
-  if (!secret) return;
-
-  if (button.dataset.secretAction === "delete") {
-    secretEntries = secretEntries.filter((item) => item.id !== id);
-    if (editingSecretId === id) {
-      resetSecretForm();
-    }
-    saveWorkspaceSecrets(currentWorkspaceId);
-    renderSecretsList();
-    renderWorkspaceAnalytics();
-    secretsStatus.textContent = "Secret deleted.";
-    return;
-  }
-
-  editingSecretId = id;
-  secretDomainInput.value = secret.domainPattern;
-  secretKeyInput.value = secret.key;
-  secretValueInput.value = secret.value;
-  secretPlacementInput.value = secret.placement;
-  secretEnabledInput.checked = secret.enabled;
-  saveSecretBtn.textContent = "Update Secret";
-  secretsStatus.textContent = "Editing selected secret.";
-});
-
-saveSecretBtn.addEventListener("click", () => {
-  const domainPattern = normalizeDomainPattern(secretDomainInput.value);
-  const key = secretKeyInput.value.trim();
-  const value = secretValueInput.value;
-  const placement: SecretPlacement = secretPlacementInput.value === "query" ? "query" : "header";
-  const enabled = secretEnabledInput.checked;
-
-  if (!domainPattern || !key || !value) {
-    secretsStatus.textContent = "Domain, key, and value are required.";
-    return;
-  }
-
-  if (editingSecretId) {
-    secretEntries = secretEntries.map((secret) =>
-      secret.id === editingSecretId ? { ...secret, domainPattern, key, value, placement, enabled } : secret
-    );
-    secretsStatus.textContent = "Secret updated.";
-  } else {
-    const duplicate = secretEntries.find(
-      (secret) =>
-        secret.domainPattern === domainPattern && secret.key.toLowerCase() === key.toLowerCase() && secret.placement === placement
-    );
-    if (duplicate) {
-      secretEntries = secretEntries.map((secret) =>
-        secret.id === duplicate.id ? { ...secret, value, enabled } : secret
-      );
-      secretsStatus.textContent = "Existing secret updated.";
-    } else {
-      secretEntries.push({
-        id: crypto.randomUUID(),
-        domainPattern,
-        key,
-        value,
-        placement,
-        enabled
-      });
-      secretsStatus.textContent = "Secret added.";
-    }
-  }
-
-  saveWorkspaceSecrets(currentWorkspaceId);
-  resetSecretForm();
-  renderSecretsList();
-  renderWorkspaceAnalytics();
-});
-
-cancelSecretEditBtn.addEventListener("click", () => {
-  resetSecretForm();
-  secretsStatus.textContent = "Secret edit canceled.";
 });
 
 const syncActiveRepeaterFromInputs = () => {
@@ -3109,16 +2814,21 @@ clearWorkspaceBtn.addEventListener("click", async () => {
   endpointTestResults.clear();
   endpointLastRequestBodies.clear();
   endpointLastRequestHeaders.clear();
-  secretEntries = [];
-  renderSecretsList();
+  secretsFeature.setSecrets([]);
+  requestHeadersByEndpoint = {};
   repeaterEntries = [];
   activeRepeaterEntryId = null;
+  proxyTrafficEntries = [];
+  selectedProxyTrafficId = null;
+  proxyViewLimitByTab = { http: PROXY_TRAFFIC_PAGE_SIZE, websocket: PROXY_TRAFFIC_PAGE_SIZE };
   renderRepeater();
+  renderProxyTraffic();
   editingDiscoveredEndpointId = null;
   const setup = defaultWorkspaceSetup();
   siteBaseUrlInput.value = setup.siteBaseUrl;
   siteMaxPagesInput.value = String(setup.siteMaxPages);
   passiveDiscoveryEnabledInput.checked = setup.passiveDiscoveryEnabled;
+  proxyDiscoveryEnabledInput.checked = setup.proxyDiscoveryEnabled;
   saveWorkspaceSetup(currentWorkspaceId, setup);
   renderDiscoveredEndpoints();
   render();
@@ -3134,8 +2844,13 @@ addDiscoveredRoutesBtn.addEventListener("click", () => {
 
 renderDiscoveredEndpoints();
 renderRepeater();
-renderSecretsList();
-resetSecretForm();
+applyProxyColumnWidths();
+setupProxyColumnResize();
+setupProxyDetailResize();
+renderProxyTraffic();
+window.addEventListener("resize", syncProxyHeaderWithListScrollbar);
+secretsFeature.renderSecretsList();
+secretsFeature.resetSecretForm();
 resetManagedEndpointForm();
 syncAuthModeInputs();
 authModeSelect.addEventListener("change", syncAuthModeInputs);
@@ -3145,6 +2860,7 @@ const initialSetup = readWorkspaceSetup(currentWorkspaceId);
 siteBaseUrlInput.value = initialSetup.siteBaseUrl || siteBaseUrlInput.value;
 siteMaxPagesInput.value = String(initialSetup.siteMaxPages || 6);
 passiveDiscoveryEnabledInput.checked = initialSetup.passiveDiscoveryEnabled;
+proxyDiscoveryEnabledInput.checked = initialSetup.proxyDiscoveryEnabled;
 
 syncAiInputsFromSettings();
 aiWorkflowPreview.textContent = "";
@@ -3180,6 +2896,51 @@ siteMaxPagesInput.addEventListener("change", () => {
 passiveDiscoveryEnabledInput.addEventListener("change", () => {
   saveWorkspaceSetup(currentWorkspaceId, getWorkspaceSetupFromInputs());
   renderWorkspaceAnalytics();
+});
+
+proxyDiscoveryEnabledInput.addEventListener("change", () => {
+  saveWorkspaceSetup(currentWorkspaceId, getWorkspaceSetupFromInputs());
+  renderWorkspaceAnalytics();
+  renderProxyTraffic();
+});
+
+proxyHttpTabBtn.addEventListener("click", () => {
+  activeProxyTrafficTab = "http";
+  proxyViewLimitByTab.http = Math.max(proxyViewLimitByTab.http, PROXY_TRAFFIC_PAGE_SIZE);
+  renderProxyTraffic();
+});
+
+proxyWebSocketTabBtn.addEventListener("click", () => {
+  activeProxyTrafficTab = "websocket";
+  proxyViewLimitByTab.websocket = Math.max(proxyViewLimitByTab.websocket, PROXY_TRAFFIC_PAGE_SIZE);
+  renderProxyTraffic();
+});
+
+proxyTrafficList.addEventListener("click", (event) => {
+  const target = event.target as HTMLElement;
+  const row = target.closest<HTMLElement>("[data-proxy-entry-id]");
+  if (!row) return;
+  const id = row.dataset.proxyEntryId;
+  if (!id) return;
+  selectedProxyTrafficId = id;
+  renderProxyTraffic();
+});
+
+clearProxyTrafficBtn.addEventListener("click", () => {
+  proxyTrafficEntries = [];
+  selectedProxyTrafficId = null;
+  proxyViewLimitByTab = { http: PROXY_TRAFFIC_PAGE_SIZE, websocket: PROXY_TRAFFIC_PAGE_SIZE };
+  proxyTrafficList.scrollTop = 0;
+  renderProxyTraffic();
+});
+
+proxyTrafficList.addEventListener("scroll", () => {
+  const nearBottom = proxyTrafficList.scrollTop + proxyTrafficList.clientHeight >= proxyTrafficList.scrollHeight - 48;
+  if (!nearBottom) return;
+  const totalForTab = proxyTrafficEntries.filter((entry) => entry.type === activeProxyTrafficTab).length;
+  if (proxyViewLimitByTab[activeProxyTrafficTab] >= totalForTab) return;
+  proxyViewLimitByTab[activeProxyTrafficTab] += PROXY_TRAFFIC_PAGE_SIZE;
+  renderProxyTraffic();
 });
 
 void (async () => {
@@ -3436,25 +3197,104 @@ chrome.devtools.network.onNavigated.addListener(() => {
 
 chrome.devtools.network.onRequestFinished.addListener((entry) => {
   if (Date.now() < runtimeDiscoveryPauseUntil) return;
-  if (!passiveDiscoveryEnabledInput.checked) return;
+  const passiveOn = passiveDiscoveryEnabledInput.checked;
+  const proxyOn = proxyDiscoveryEnabledInput.checked;
+  if (!passiveOn && !proxyOn) return;
   const rawUrl = entry?.request?.url;
   if (!rawUrl || typeof rawUrl !== "string") return;
+  if (!/^(https?|wss?):\/\//i.test(rawUrl)) return;
   const methodCandidate = (entry?.request?.method || "GET").toUpperCase();
   const method = METHOD_SET.has(methodCandidate as HttpMethod) ? (methodCandidate as HttpMethod) : "GET";
+  const status = typeof entry?.response?.status === "number" ? entry.response.status : 0;
+  const statusTextRaw = typeof entry?.response?.statusText === "string" ? entry.response.statusText : "";
+  const statusText = resolveStatusText(status, statusTextRaw);
   const mimeType =
     typeof entry?.response?.content?.mimeType === "string" ? entry.response.content.mimeType : "";
-  if (!isLikelyApiRequest(rawUrl, method, mimeType)) return;
+  const durationMs = resolveProxyDurationMs(entry);
+  const isWsTraffic = isWebSocketUrl(rawUrl) || status === 101 || /websocket/i.test(mimeType);
+
+  if (proxyOn) {
+    let path = "/";
+    let hasQuery = false;
+    try {
+      const parsed = new URL(rawUrl);
+      path = parsed.pathname || "/";
+      hasQuery = Boolean(parsed.search && parsed.search.length > 1);
+    } catch {}
+    const proxyEntryId = crypto.randomUUID();
+    const requestHeaders =
+      Array.isArray(entry?.request?.headers) && entry.request.headers.length > 0
+        ? entry.request.headers
+            .filter((header) => {
+              const name = (header.name || "").toLowerCase();
+              return name !== ":authority" && name !== ":method" && name !== ":path" && name !== ":scheme";
+            })
+            .map((header) => `${header.name}: ${header.value}`)
+            .join("\n")
+        : "";
+    const requestHttpVersion =
+      typeof entry?.request?.httpVersion === "string" && entry.request.httpVersion
+        ? entry.request.httpVersion
+        : "HTTP/?";
+    const responseHeaders =
+      Array.isArray(entry?.response?.headers) && entry.response.headers.length > 0
+        ? entry.response.headers
+            .map((header) => `${header.name}: ${header.value}`)
+            .join("\n")
+        : "";
+    const responseHttpVersion =
+      typeof entry?.response?.httpVersion === "string" && entry.response.httpVersion
+        ? entry.response.httpVersion
+        : "HTTP/?";
+    const requestBody =
+      typeof entry?.request?.postData?.text === "string" ? entry.request.postData.text : "";
+    addProxyTrafficEntry({
+      id: proxyEntryId,
+      ts: Date.now(),
+      type: isWsTraffic ? "websocket" : "http",
+      method: isWsTraffic ? "WS" : method,
+      url: rawUrl,
+      path,
+      hasQuery,
+      status,
+      statusText,
+      mimeType,
+      durationMs,
+      requestHttpVersion,
+      requestHeaders,
+      requestBody,
+      responseHttpVersion,
+      responseHeaders,
+      responseBody: ""
+    });
+    if (!isWsTraffic) {
+      try {
+        entry.getContent((content) => {
+          updateProxyTrafficEntry(proxyEntryId, {
+            responseBody: typeof content === "string" ? content : ""
+          });
+        });
+      } catch {}
+    }
+  }
+
+  const likelyApi = isLikelyApiRequest(rawUrl, method, mimeType);
+  if (!proxyOn && !likelyApi) return;
 
   const sanitizedUrl = sanitizeDiscoveredUrl(rawUrl);
-  const group = normalizeDiscoveredGroup(inferGroupFromEndpointUrl(sanitizedUrl));
+  const group = likelyApi
+    ? normalizeDiscoveredGroup(inferGroupFromEndpointUrl(sanitizedUrl))
+    : "Proxy Capture";
   const added = mergeDiscoveredEndpoints([
     {
       id: crypto.randomUUID(),
       url: sanitizedUrl,
       method,
       group,
-      confidence: 0.72,
-      reason: "Captured from manual runtime network traffic."
+      confidence: proxyOn && !likelyApi ? 0.68 : 0.72,
+      reason: proxyOn
+        ? "Captured from proxy-mode runtime traffic while navigating the app."
+        : "Captured from manual runtime network traffic."
     }
   ]);
   if (added > 0) {
@@ -3468,3 +3308,4 @@ window.addEventListener("beforeunload", () => {
 
 setActivePage("site-setup");
 render();
+

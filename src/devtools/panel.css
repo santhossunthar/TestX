@@ -11,6 +11,14 @@
   --input-bg: #ffffff;
   --input-border: #8c959f;
   --accent: #1f6feb;
+  --proxy-col-datetime: 150px;
+  --proxy-col-method: 70px;
+  --proxy-col-url: 260px;
+  --proxy-col-path: 160px;
+  --proxy-col-param: 70px;
+  --proxy-col-status: 70px;
+  --proxy-col-time: 90px;
+  --proxy-table-min-width: 918px;
 }
 
 :root[data-theme="dark"] {
@@ -29,6 +37,59 @@ body {
   font-family: "Segoe UI", Tahoma, sans-serif;
   color: var(--fg);
   background: var(--bg);
+}
+
+/* Modern scroll behavior + themed scrollbars for panel surfaces */
+.workspace,
+.proxy-list-pane,
+.proxy-table-list,
+.repeater-tabs,
+pre,
+textarea {
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent) 45%, var(--border))
+    color-mix(in srgb, var(--surface) 80%, var(--bg));
+}
+
+.workspace::-webkit-scrollbar,
+.proxy-list-pane::-webkit-scrollbar,
+.proxy-table-list::-webkit-scrollbar,
+.repeater-tabs::-webkit-scrollbar,
+pre::-webkit-scrollbar,
+textarea::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.workspace::-webkit-scrollbar-track,
+.proxy-list-pane::-webkit-scrollbar-track,
+.proxy-table-list::-webkit-scrollbar-track,
+.repeater-tabs::-webkit-scrollbar-track,
+pre::-webkit-scrollbar-track,
+textarea::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--surface) 80%, var(--bg));
+  border-radius: 999px;
+}
+
+.workspace::-webkit-scrollbar-thumb,
+.proxy-list-pane::-webkit-scrollbar-thumb,
+.proxy-table-list::-webkit-scrollbar-thumb,
+.repeater-tabs::-webkit-scrollbar-thumb,
+pre::-webkit-scrollbar-thumb,
+textarea::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 999px;
+  border: 2px solid color-mix(in srgb, var(--surface) 80%, var(--bg));
+}
+
+.workspace::-webkit-scrollbar-thumb:hover,
+.proxy-list-pane::-webkit-scrollbar-thumb:hover,
+.proxy-table-list::-webkit-scrollbar-thumb:hover,
+.repeater-tabs::-webkit-scrollbar-thumb:hover,
+pre::-webkit-scrollbar-thumb:hover,
+textarea::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--accent) 65%, var(--border));
 }
 
 .toolbar {
@@ -112,6 +173,7 @@ body {
 .workspace {
   padding: 12px;
   overflow: auto;
+  min-width: 0;
 }
 
 .page {
@@ -187,7 +249,8 @@ body {
 }
 
 .page-card {
-  max-width: 900px;
+  max-width: none;
+  width: 100%;
 }
 
 .panel-card h3,
@@ -213,6 +276,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .check-row {
@@ -226,6 +290,27 @@ body {
 .check-row input[type="checkbox"] {
   width: 14px;
   height: 14px;
+}
+
+.page[data-page="test-endpoints"] .inline {
+  align-items: center;
+}
+
+.page[data-page="test-endpoints"] .inline .check-row {
+  white-space: nowrap;
+}
+
+.page[data-page="test-endpoints"] #runEndpointTestingBtn {
+  width: auto;
+  flex: 0 0 auto;
+}
+
+.page[data-page="request-headers"] textarea {
+  font-family: Consolas, "Courier New", monospace;
+}
+
+.page[data-page="request-headers"] .inline button {
+  width: auto;
 }
 
 input,
@@ -300,6 +385,7 @@ aside.nav-panel button.nav-item {
 #saveSecretBtn::before { content: "\2713"; }
 #cancelSecretEditBtn::before { content: "\2715"; }
 #useCurrentSiteDomainBtn::before { content: "\1f310"; }
+#clearProxyTrafficBtn::before { content: "\1f5d1"; }
 button[data-secret-action="edit"]::before { content: "\270e"; }
 button[data-secret-action="delete"]::before { content: "\2715"; }
 button[data-endpoint-action="edit"]::before { content: "\270e"; }
@@ -542,6 +628,175 @@ pre {
   justify-content: flex-start;
 }
 
+.proxy-meta {
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.proxy-tabbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.proxy-tab {
+  width: auto;
+  min-width: 92px;
+}
+
+.proxy-tab.is-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--input-bg));
+}
+
+.proxy-tabbar #clearProxyTrafficBtn {
+  margin-left: auto;
+  width: auto;
+}
+
+.proxy-table-head,
+.proxy-row {
+  display: grid;
+  grid-template-columns:
+    var(--proxy-col-datetime)
+    var(--proxy-col-method)
+    minmax(var(--proxy-col-url), 1.7fr)
+    minmax(var(--proxy-col-path), 1.1fr)
+    var(--proxy-col-param)
+    var(--proxy-col-status)
+    var(--proxy-col-time);
+  gap: 8px;
+  align-items: center;
+  min-width: var(--proxy-table-min-width);
+  width: 100%;
+}
+
+.proxy-table-head {
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px calc(8px + var(--proxy-list-scrollbar-width, 0px)) 8px 8px;
+  background: var(--surface);
+}
+
+.proxy-table-head span {
+  position: relative;
+}
+
+.proxy-table-head span::before,
+.proxy-table-head span::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 8px;
+  cursor: col-resize;
+}
+
+.proxy-table-head span::before {
+  left: -4px;
+}
+
+.proxy-table-head span::after {
+  right: -4px;
+}
+
+.proxy-table-list {
+  display: grid;
+  gap: 6px;
+  max-height: 34vh;
+  min-height: 180px;
+  overflow-y: auto;
+  overflow-x: visible;
+  padding-right: 0;
+}
+
+.proxy-row {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--input-bg);
+  text-align: left;
+}
+
+.proxy-row.is-selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--input-bg));
+}
+
+.proxy-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.proxy-table-head .proxy-col-center,
+.proxy-row .proxy-col-center {
+  display: block;
+  width: 100%;
+  text-align: center !important;
+  justify-self: center;
+}
+
+.proxy-detail-grid {
+  display: grid;
+  grid-template-columns:
+    minmax(220px, var(--proxy-detail-request-width, 1fr))
+    minmax(220px, var(--proxy-detail-response-width, 1fr));
+  gap: 10px;
+  height: 100%;
+}
+
+.proxy-main-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto;
+  gap: 10px;
+}
+
+.proxy-list-pane,
+.proxy-detail-pane {
+  min-width: 0;
+}
+
+.proxy-detail-pane {
+  height: clamp(220px, 36vh, 460px);
+}
+
+.proxy-list-pane {
+  display: grid;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.proxy-detail-col {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.proxy-detail-col pre {
+  margin: 0;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  background: var(--input-bg);
+}
+
 
 @media (max-width: 1080px) {
   .routes-top {
@@ -549,7 +804,88 @@ pre {
   }
 }
 
+@media (max-width: 1220px) {
+  .layout {
+    grid-template-columns: 180px 1fr;
+  }
+
+  .routes-top {
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+  }
+
+  .grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 1024px) {
+  .toolbar {
+    height: auto;
+    min-height: 42px;
+    padding: 8px 10px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .toolbar-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .toolbar-actions #workspaceSelect {
+    min-width: 0;
+    flex: 1 1 220px;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .nav-panel {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+
+  .nav-title {
+    grid-column: 1 / -1;
+  }
+
+  .workspace {
+    padding: 10px;
+  }
+
+  .workspace-head {
+    grid-template-columns: 1fr;
+  }
+
+  .repeater-view {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 920px) {
+  .routes-top {
+    grid-template-columns: 1fr;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .proxy-tabbar {
+    gap: 6px;
+  }
+
+  .proxy-tabbar #clearProxyTrafficBtn {
+    margin-left: 0;
+  }
+
   .layout {
     grid-template-columns: 1fr;
     height: auto;
@@ -568,6 +904,29 @@ pre {
 
   .repeater-view {
     grid-template-columns: 1fr;
+  }
+
+  .proxy-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .proxy-detail-pane {
+    height: auto;
+  }
+
+  .proxy-detail-col pre {
+    min-height: 160px;
+    max-height: 280px;
+  }
+}
+
+@media (max-width: 700px) {
+  .endpoint-item-head {
+    flex-wrap: wrap;
+  }
+
+  .route-item {
+    flex-wrap: wrap;
   }
 }
 

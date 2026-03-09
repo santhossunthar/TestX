@@ -1,16 +1,13 @@
 import type { BackgroundEnvelope, InspectorEvent } from "../shared/types";
+import { EventBuffer } from "./event-buffer";
+import { PanelPortRegistry } from "./panel-port-registry";
 
-const panelPorts = new Map<number, chrome.runtime.Port>();
-const eventBuffer = new Map<number, InspectorEvent[]>();
 const MAX_EVENTS = 5000;
+const panelPorts = new PanelPortRegistry();
+const eventBuffer = new EventBuffer(MAX_EVENTS);
 
 const pushBuffered = (tabId: number, event: InspectorEvent) => {
-  const current = eventBuffer.get(tabId) ?? [];
-  current.push(event);
-  if (current.length > MAX_EVENTS) {
-    current.splice(0, current.length - MAX_EVENTS);
-  }
-  eventBuffer.set(tabId, current);
+  eventBuffer.push(tabId, event);
 };
 
 chrome.runtime.onConnect.addListener((port) => {
@@ -21,15 +18,15 @@ chrome.runtime.onConnect.addListener((port) => {
   port.onMessage.addListener((msg: { kind: string; tabId?: number }) => {
     if (msg.kind === "register-panel" && typeof msg.tabId === "number") {
       tabId = msg.tabId;
-      panelPorts.set(tabId, port);
-      const buffered = eventBuffer.get(tabId) ?? [];
+      panelPorts.register(tabId, port);
+      const buffered = eventBuffer.get(tabId);
       port.postMessage({ kind: "bootstrap", events: buffered });
     }
   });
 
   port.onDisconnect.addListener(() => {
     if (tabId >= 0) {
-      panelPorts.delete(tabId);
+      panelPorts.unregister(tabId);
     }
   });
 });
