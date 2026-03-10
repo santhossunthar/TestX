@@ -18,7 +18,8 @@
   --proxy-col-param: 70px;
   --proxy-col-status: 70px;
   --proxy-col-time: 90px;
-  --proxy-table-min-width: 918px;
+  --proxy-col-length: 120px;
+  --proxy-table-min-width: 1062px;
 }
 
 :root[data-theme="dark"] {
@@ -172,8 +173,13 @@ textarea::-webkit-scrollbar-thumb:hover {
 
 .workspace {
   padding: 12px;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   min-width: 0;
+}
+
+.workspace:has(.page[data-page="repeater"].is-active) {
+  overflow: hidden;
 }
 
 .page {
@@ -600,9 +606,9 @@ pre {
 }
 
 .repeater-view {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  display: block;
+  height: 100%;
+  min-height: 0;
 }
 
 .repeater-pane {
@@ -610,6 +616,238 @@ pre {
   border-radius: 8px;
   background: var(--surface);
   padding: 8px;
+}
+
+.repeater-layout {
+  display: grid;
+  grid-template-rows:
+    auto
+    minmax(260px, var(--repeater-request-height, 1fr))
+    8px
+    minmax(180px, var(--repeater-response-height, 1fr));
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
+}
+
+.repeater-row {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.repeater-layout > .repeater-row:nth-child(2) {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.repeater-split-handle {
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--border) 82%, var(--surface));
+  cursor: row-resize;
+}
+
+.repeater-split-handle:hover {
+  background: color-mix(in srgb, var(--accent) 30%, var(--border));
+}
+
+.page[data-page="repeater"] {
+  height: 100%;
+  min-height: 0;
+}
+
+.page[data-page="repeater"].is-active {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.page[data-page="repeater"] .panel-card.page-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.page[data-page="repeater"] .stack {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.page[data-page="repeater"] #repeaterTabs,
+.page[data-page="repeater"] #repeaterEmptyState {
+  flex: 0 0 auto;
+}
+
+.page[data-page="repeater"] #repeaterView {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.repeater-top-row {
+  grid-template-columns: 110px minmax(220px, 1fr) auto auto;
+  align-items: center;
+}
+
+.repeater-top-row #repeaterMethodInput {
+  min-width: 0;
+}
+
+.repeater-top-row #repeaterUrlInput {
+  min-width: 0;
+}
+
+.repeater-top-row #repeaterSendBtn {
+  width: auto;
+  min-width: 90px;
+}
+
+.repeater-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.repeater-row-head #repeaterAddHeaderBtn {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+  margin-left: auto;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.repeater-flow-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 4px;
+}
+
+.repeater-flow-nav button {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+}
+
+.repeater-request-row {
+  min-height: 0;
+}
+
+.repeater-request-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.repeater-request-tab {
+  width: auto;
+  min-width: 72px;
+}
+
+.repeater-request-tab.is-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--input-bg));
+}
+
+.repeater-request-pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+#repeaterRequestHeadersPane {
+  min-height: 190px;
+}
+
+.repeater-request-pane.hidden {
+  display: none;
+}
+
+#repeaterRequestRawInput {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  background: var(--surface);
+}
+
+.repeater-header-table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.repeater-header-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 520px;
+}
+
+.repeater-header-table th,
+.repeater-header-table td {
+  border: 1px solid var(--border);
+  padding: 6px;
+  vertical-align: middle;
+  font-size: 12px;
+}
+
+.repeater-header-table th {
+  text-align: left;
+  color: var(--muted);
+  background: var(--surface);
+}
+
+.repeater-header-table td button {
+  width: auto;
+  min-width: 36px;
+  padding: 0 10px;
+}
+
+.repeater-scroll-row {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.repeater-scroll-row h4 {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+#repeaterBodyInput {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+  overflow: auto;
+  resize: none;
+}
+
+#repeaterResponseBody {
+  margin: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  background: var(--surface);
 }
 
 .context-menu {
@@ -667,7 +905,8 @@ pre {
     minmax(var(--proxy-col-path), 1.1fr)
     var(--proxy-col-param)
     var(--proxy-col-status)
-    var(--proxy-col-time);
+    var(--proxy-col-time)
+    var(--proxy-col-length);
   gap: 8px;
   align-items: center;
   min-width: var(--proxy-table-min-width);
@@ -685,6 +924,14 @@ pre {
 
 .proxy-table-head span {
   position: relative;
+  padding: 0 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.proxy-table-head span:not(:last-child) {
+  border-right: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
 }
 
 .proxy-table-head span::before,
@@ -707,11 +954,13 @@ pre {
 
 .proxy-table-list {
   display: grid;
-  gap: 6px;
+  gap: 4px;
+  align-content: start;
+  grid-auto-rows: min-content;
   max-height: 34vh;
   min-height: 180px;
   overflow-y: auto;
-  overflow-x: visible;
+  overflow-x: hidden;
   padding-right: 0;
 }
 
@@ -735,6 +984,7 @@ pre {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;
+  padding: 0 8px;
 }
 
 .proxy-table-head .proxy-col-center,
@@ -904,6 +1154,27 @@ pre {
 
   .repeater-view {
     grid-template-columns: 1fr;
+  }
+
+  .repeater-top-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .repeater-layout {
+    grid-template-rows:
+      auto
+      minmax(160px, var(--repeater-request-height, 1fr))
+      8px
+      minmax(160px, var(--repeater-response-height, 1fr));
+  }
+
+  #repeaterBodyInput {
+    resize: none;
+  }
+
+  .repeater-top-row #repeaterSendBtn {
+    width: 100%;
   }
 
   .proxy-detail-grid {

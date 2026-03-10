@@ -175,6 +175,7 @@
                     <span class="proxy-col-center">Param</span>
                     <span class="proxy-col-center">Status</span>
                     <span class="proxy-col-center">Response Time</span>
+                    <span class="proxy-col-center">Content Length</span>
                   </div>
                   <div id="proxyTrafficList" class="proxy-table-list"></div>
                 </section>
@@ -258,41 +259,64 @@
                 No endpoint in repeater. Right-click an endpoint in Test Endpoints and choose Send to Repeater.
               </div>
               <div id="repeaterView" class="repeater-view hidden">
-                <div class="repeater-pane">
-                  <h4>Request</h4>
-                  <div class="stack">
-                    <div class="inline">
-                      <select id="repeaterMethodInput">
-                        <option>GET</option>
-                        <option>POST</option>
-                        <option>PUT</option>
-                        <option>PATCH</option>
-                        <option>DELETE</option>
-                        <option>HEAD</option>
-                        <option>OPTIONS</option>
-                      </select>
-                      <input id="repeaterUrlInput" type="url" placeholder="https://api.example.com/items" />
-                    </div>
-                    <label>
-                      Headers (JSON or key:value per line)
-                      <textarea id="repeaterHeadersInput" rows="5"></textarea>
-                    </label>
-                    <label>
-                      Body
-                      <textarea id="repeaterBodyInput" rows="8"></textarea>
-                    </label>
-                    <div class="inline">
-                      <button id="repeaterSendBtn" type="button">Send</button>
-                      <span id="repeaterResponseMeta"></span>
+                <div id="repeaterLayout" class="repeater-pane repeater-layout">
+                  <div class="repeater-row repeater-top-row">
+                    <select id="repeaterMethodInput">
+                      <option>GET</option>
+                      <option>POST</option>
+                      <option>PUT</option>
+                      <option>PATCH</option>
+                      <option>DELETE</option>
+                      <option>HEAD</option>
+                      <option>OPTIONS</option>
+                    </select>
+                    <input id="repeaterUrlInput" type="url" placeholder="https://api.example.com/items" />
+                    <button id="repeaterSendBtn" type="button">Send</button>
+                    <div id="repeaterFlowNav" class="repeater-flow-nav hidden">
+                      <button id="repeaterPrevFlowBtn" type="button" title="Previous Pair" aria-label="Previous Pair">&lt;</button>
+                      <button id="repeaterNextFlowBtn" type="button" title="Next Pair" aria-label="Next Pair">&gt;</button>
+                      <button id="repeaterLastFlowBtn" type="button" title="Jump To Final Pair" aria-label="Jump To Final Pair">&gt;|</button>
                     </div>
                   </div>
-                </div>
-                <div class="repeater-pane">
-                  <h4>Response</h4>
-                  <div class="response-wrap">
-                    <h4>Response Headers</h4>
-                    <pre id="repeaterResponseHeaders"></pre>
-                    <h4>Response Body</h4>
+
+                  <div id="repeaterRequestSection" class="repeater-row repeater-scroll-row repeater-request-row">
+                    <div class="repeater-row-head">
+                      <h4>Request</h4>
+                      <div class="repeater-request-tabs">
+                        <button id="repeaterRequestRawTabBtn" type="button" class="repeater-request-tab is-active">Raw</button>
+                        <button id="repeaterRequestHeadersTabBtn" type="button" class="repeater-request-tab">Headers</button>
+                        <button id="repeaterRequestBodyTabBtn" type="button" class="repeater-request-tab">Body</button>
+                      </div>
+                    </div>
+                    <div id="repeaterRequestRawPane" class="repeater-request-pane">
+                      <textarea id="repeaterRequestRawInput" rows="10"></textarea>
+                    </div>
+                    <div id="repeaterRequestHeadersPane" class="repeater-request-pane hidden">
+                      <div class="repeater-row-head">
+                        <button id="repeaterAddHeaderBtn" type="button" title="Add Header" aria-label="Add Header">+</button>
+                      </div>
+                      <div class="repeater-header-table-wrap">
+                        <table class="repeater-header-table">
+                          <thead>
+                            <tr>
+                              <th>Request Header</th>
+                              <th>Value</th>
+                              <th></th>
+                            </tr>
+                          </thead>
+                          <tbody id="repeaterHeadersTableBody"></tbody>
+                        </table>
+                      </div>
+                    </div>
+                    <div id="repeaterRequestBodyPane" class="repeater-request-pane hidden">
+                      <textarea id="repeaterBodyInput" rows="8"></textarea>
+                    </div>
+                  </div>
+
+                  <div id="repeaterSplitHandle" class="repeater-split-handle" aria-hidden="true"></div>
+
+                  <div id="repeaterResponseSection" class="repeater-row repeater-scroll-row">
+                    <h4>Response</h4>
                     <pre id="repeaterResponseBody"></pre>
                   </div>
                 </div>

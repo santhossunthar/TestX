@@ -76,6 +76,22 @@ export interface RepeaterEntry {
   url: string;
   headers: string;
   body: string;
+  responseMeta?: string;
+  responseBody?: string;
+  flowSteps?: RepeaterFlowStep[];
+  activeFlowIndex?: number;
+}
+
+export interface RepeaterFlowStep {
+  requestMethod: HttpMethod;
+  requestUrl: string;
+  requestHeaders: string;
+  requestBody: string;
+  responseStatus: number;
+  responseStatusText: string;
+  responseHeaders: string;
+  responseBody: string;
+  elapsedMs: number;
 }
 
 export interface SecretEntry {

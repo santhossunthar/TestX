@@ -13,6 +13,7 @@ import {
   type HttpMethod,
   type ImportedRoute,
   type RepeaterEntry,
+  type RepeaterFlowStep,
   type Theme,
   type WorkflowPlan,
   type WorkflowStep,
@@ -128,13 +129,27 @@ const manageEndpointsList = document.querySelector<HTMLDivElement>("#manageEndpo
 const repeaterTabs = document.querySelector<HTMLDivElement>("#repeaterTabs");
 const repeaterEmptyState = document.querySelector<HTMLDivElement>("#repeaterEmptyState");
 const repeaterView = document.querySelector<HTMLDivElement>("#repeaterView");
+const repeaterLayout = document.querySelector<HTMLDivElement>("#repeaterLayout");
+const repeaterRequestSection = document.querySelector<HTMLDivElement>("#repeaterRequestSection");
+const repeaterResponseSection = document.querySelector<HTMLDivElement>("#repeaterResponseSection");
+const repeaterSplitHandle = document.querySelector<HTMLDivElement>("#repeaterSplitHandle");
 const repeaterMethodInput = document.querySelector<HTMLSelectElement>("#repeaterMethodInput");
 const repeaterUrlInput = document.querySelector<HTMLInputElement>("#repeaterUrlInput");
-const repeaterHeadersInput = document.querySelector<HTMLTextAreaElement>("#repeaterHeadersInput");
+const repeaterRequestRawTabBtn = document.querySelector<HTMLButtonElement>("#repeaterRequestRawTabBtn");
+const repeaterRequestHeadersTabBtn = document.querySelector<HTMLButtonElement>("#repeaterRequestHeadersTabBtn");
+const repeaterRequestBodyTabBtn = document.querySelector<HTMLButtonElement>("#repeaterRequestBodyTabBtn");
+const repeaterRequestRawPane = document.querySelector<HTMLDivElement>("#repeaterRequestRawPane");
+const repeaterRequestHeadersPane = document.querySelector<HTMLDivElement>("#repeaterRequestHeadersPane");
+const repeaterRequestBodyPane = document.querySelector<HTMLDivElement>("#repeaterRequestBodyPane");
+const repeaterRequestRawInput = document.querySelector<HTMLTextAreaElement>("#repeaterRequestRawInput");
+const repeaterHeadersTableBody = document.querySelector<HTMLTableSectionElement>("#repeaterHeadersTableBody");
+const repeaterAddHeaderBtn = document.querySelector<HTMLButtonElement>("#repeaterAddHeaderBtn");
 const repeaterBodyInput = document.querySelector<HTMLTextAreaElement>("#repeaterBodyInput");
 const repeaterSendBtn = document.querySelector<HTMLButtonElement>("#repeaterSendBtn");
-const repeaterResponseMeta = document.querySelector<HTMLSpanElement>("#repeaterResponseMeta");
-const repeaterResponseHeaders = document.querySelector<HTMLPreElement>("#repeaterResponseHeaders");
+const repeaterFlowNav = document.querySelector<HTMLDivElement>("#repeaterFlowNav");
+const repeaterPrevFlowBtn = document.querySelector<HTMLButtonElement>("#repeaterPrevFlowBtn");
+const repeaterNextFlowBtn = document.querySelector<HTMLButtonElement>("#repeaterNextFlowBtn");
+const repeaterLastFlowBtn = document.querySelector<HTMLButtonElement>("#repeaterLastFlowBtn");
 const repeaterResponseBody = document.querySelector<HTMLPreElement>("#repeaterResponseBody");
 const secretDomainInput = document.querySelector<HTMLInputElement>("#secretDomainInput");
 const useCurrentSiteDomainBtn = document.querySelector<HTMLButtonElement>("#useCurrentSiteDomainBtn");
@@ -264,13 +279,27 @@ if (
   !repeaterTabs ||
   !repeaterEmptyState ||
   !repeaterView ||
+  !repeaterLayout ||
+  !repeaterRequestSection ||
+  !repeaterResponseSection ||
+  !repeaterSplitHandle ||
   !repeaterMethodInput ||
   !repeaterUrlInput ||
-  !repeaterHeadersInput ||
+  !repeaterRequestRawTabBtn ||
+  !repeaterRequestHeadersTabBtn ||
+  !repeaterRequestBodyTabBtn ||
+  !repeaterRequestRawPane ||
+  !repeaterRequestHeadersPane ||
+  !repeaterRequestBodyPane ||
+  !repeaterRequestRawInput ||
+  !repeaterHeadersTableBody ||
+  !repeaterAddHeaderBtn ||
   !repeaterBodyInput ||
   !repeaterSendBtn ||
-  !repeaterResponseMeta ||
-  !repeaterResponseHeaders ||
+  !repeaterFlowNav ||
+  !repeaterPrevFlowBtn ||
+  !repeaterNextFlowBtn ||
+  !repeaterLastFlowBtn ||
   !repeaterResponseBody ||
   !secretDomainInput ||
   !useCurrentSiteDomainBtn ||
@@ -370,7 +399,9 @@ let runtimeDiscoveryRenderTimer: number | null = null;
 let runtimeDiscoveryPauseUntil = 0;
 let repeaterEntries: RepeaterEntry[] = [];
 let activeRepeaterEntryId: string | null = null;
+let activeRepeaterRequestTab: "raw" | "headers" | "body" = "raw";
 let contextMenuEndpointId: string | null = null;
+let contextMenuProxyEntryId: string | null = null;
 let requestHeadersByEndpoint: Record<string, string> = readWorkspaceRequestHeaders(currentWorkspaceId);
 const selectedTestEndpointIds = new Set<string>();
 const endpointTestResults = new Map<string, EndpointTestResult>();
@@ -381,7 +412,7 @@ const PROXY_TRAFFIC_PAGE_SIZE = 80;
 const PROXY_COLUMN_MIN_WIDTH = 64;
 const PROXY_COLUMN_MAX_WIDTH = 900;
 const PROXY_DETAIL_MIN_WIDTH = 220;
-const PROXY_COLUMN_KEYS = ["datetime", "method", "url", "path", "param", "status", "time"] as const;
+const PROXY_COLUMN_KEYS = ["datetime", "method", "url", "path", "param", "status", "time", "length"] as const;
 type ProxyColumnKey = (typeof PROXY_COLUMN_KEYS)[number];
 const proxyColumnWidths: Record<ProxyColumnKey, number> = {
   datetime: 150,
@@ -390,7 +421,8 @@ const proxyColumnWidths: Record<ProxyColumnKey, number> = {
   path: 160,
   param: 70,
   status: 70,
-  time: 90
+  time: 90,
+  length: 120
 };
 
 interface ProxyTrafficEntry {
@@ -411,6 +443,7 @@ interface ProxyTrafficEntry {
   responseHttpVersion: string;
   responseHeaders: string;
   responseBody: string;
+  contentLengthBytes: number | null;
 }
 
 let proxyTrafficEntries: ProxyTrafficEntry[] = [];
@@ -429,12 +462,42 @@ const applyProxyColumnWidths = () => {
     document.documentElement.style.setProperty(`--proxy-col-${key}`, `${width}px`);
     minWidth += width;
   });
-  document.documentElement.style.setProperty("--proxy-table-min-width", `${minWidth + 48}px`);
+  const columnGaps = (PROXY_COLUMN_KEYS.length - 1) * 8;
+  const horizontalPadding = 16;
+  document.documentElement.style.setProperty(
+    "--proxy-table-min-width",
+    `${minWidth + columnGaps + horizontalPadding}px`
+  );
 };
 
 const syncProxyHeaderWithListScrollbar = () => {
   const scrollbarWidth = Math.max(0, proxyTrafficList.offsetWidth - proxyTrafficList.clientWidth);
   proxyTrafficHead.style.setProperty("--proxy-list-scrollbar-width", `${scrollbarWidth}px`);
+};
+
+const ensureProxyTableHeaderColumns = () => {
+  const labels = ["Date / Time", "Method", "URL", "Path", "Param", "Status", "Response Time", "Content Length"];
+  const centerAlignedIndexes = new Set([4, 5, 6, 7]);
+  const spans = Array.from(proxyTrafficHead.querySelectorAll<HTMLSpanElement>("span"));
+
+  labels.forEach((label, index) => {
+    const existing = spans[index];
+    if (existing) {
+      if (!existing.textContent?.trim()) {
+        existing.textContent = label;
+      }
+      if (centerAlignedIndexes.has(index)) {
+        existing.classList.add("proxy-col-center");
+      }
+      return;
+    }
+    const cell = document.createElement("span");
+    cell.textContent = label;
+    if (centerAlignedIndexes.has(index)) {
+      cell.classList.add("proxy-col-center");
+    }
+    proxyTrafficHead.appendChild(cell);
+  });
 };
 
 const formatProxyDateTime = (ts: number): string => {
@@ -447,6 +510,33 @@ const formatProxyDateTime = (ts: number): string => {
   const minutes = String(dt.getMinutes()).padStart(2, "0");
   const seconds = String(dt.getSeconds()).padStart(2, "0");
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+};
+
+const formatJsonIfPossible = (text: string): string => {
+  if (!text) return "";
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch {
+    return text;
+  }
+};
+
+const parseContentLengthHeader = (headers: string): number | null => {
+  if (!headers.trim()) return null;
+  const line = headers
+    .split(/\r?\n/)
+    .map((value) => value.trim())
+    .find((value) => /^content-length\s*:/i.test(value));
+  if (!line) return null;
+  const raw = line.split(":").slice(1).join(":").trim();
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return parsed;
+};
+
+const formatContentLength = (bytes: number | null): string => {
+  if (!Number.isFinite(bytes ?? NaN) || (bytes ?? 0) < 0) return "-";
+  return String(bytes);
 };
 
 const setupProxyColumnResize = () => {
@@ -2112,15 +2202,24 @@ const renderProxyTraffic = () => {
       const selectedClass = entry.id === selectedProxyTrafficId ? " is-selected" : "";
       const paramIcon = entry.hasQuery ? "&#10003;" : "";
       const statusCode = entry.status > 0 ? String(entry.status) : "";
+      const contentLength = formatContentLength(entry.contentLengthBytes);
       const dateTime = formatProxyDateTime(entry.ts);
+      let displayUrl = entry.url;
+      let displayPath = entry.path || "/";
+      try {
+        const parsed = new URL(entry.url);
+        displayUrl = parsed.origin || entry.url;
+        displayPath = `${parsed.pathname || "/"}${parsed.search || ""}`;
+      } catch {}
       return `<button type="button" class="proxy-row${selectedClass}" data-proxy-entry-id="${entry.id}">
         <span title="${dateTime}">${dateTime}</span>
         <span>${entry.type === "websocket" ? "WS" : entry.method}</span>
-        <span title="${entry.url}">${entry.url}</span>
-        <span title="${entry.path}">${entry.path || "/"}</span>
+        <span title="${entry.url}">${displayUrl}</span>
+        <span title="${displayPath}">${displayPath}</span>
         <span class="proxy-col-center" title="${entry.hasQuery ? "Query params found" : ""}">${paramIcon}</span>
         <span class="proxy-col-center">${statusCode}</span>
         <span class="proxy-col-center">${duration}</span>
+        <span class="proxy-col-center">${contentLength}</span>
       </button>`;
     })
     .join("");
@@ -2137,7 +2236,7 @@ const renderProxyTraffic = () => {
     requestLines.push(selected.requestHeaders.trim());
   }
   if (selected.requestBody) {
-    requestLines.push("", selected.requestBody);
+    requestLines.push("", formatJsonIfPossible(selected.requestBody));
   }
 
   const responseStatus = selected.status ? String(selected.status) : "-";
@@ -2147,7 +2246,7 @@ const renderProxyTraffic = () => {
     responseLines.push(selected.responseHeaders.trim());
   }
   if (selected.responseBody) {
-    responseLines.push("", selected.responseBody);
+    responseLines.push("", formatJsonIfPossible(selected.responseBody));
   }
 
   proxyRequestBody.textContent = requestLines.join("\n");
@@ -2281,12 +2380,423 @@ const runAutomatedEndpointTesting = async (endpointIds: string[]) => {
 const getActiveRepeaterEntry = (): RepeaterEntry | undefined =>
   repeaterEntries.find((entry) => entry.id === activeRepeaterEntryId);
 
+const buildRawRequestText = (entry: RepeaterEntry): string => {
+  const lines: string[] = [`${entry.method.toUpperCase()} ${entry.url} HTTP/?`];
+  if (entry.headers.trim()) {
+    lines.push(entry.headers.trim());
+  }
+  if (entry.body) {
+    lines.push("", formatJsonIfPossible(entry.body));
+  }
+  return lines.join("\n");
+};
+
+const parseRawRequestText = (
+  rawText: string
+): {
+  hasRequestLine: boolean;
+  method?: HttpMethod;
+  url?: string;
+  headers: string;
+  body: string;
+} => {
+  const lines = rawText.split(/\r?\n/);
+  let cursor = 0;
+  let parsedMethod: HttpMethod | undefined;
+  let parsedUrl: string | undefined;
+
+  const requestLine = lines[0]?.trim() ?? "";
+  const requestLineMatch = requestLine.match(/^([A-Z]+)\s+(\S+)(?:\s+HTTP\/\S+)?$/i);
+  const hasRequestLine = Boolean(requestLineMatch);
+  if (requestLineMatch) {
+    const methodCandidate = requestLineMatch[1].toUpperCase() as HttpMethod;
+    if (METHOD_SET.has(methodCandidate)) {
+      parsedMethod = methodCandidate;
+    }
+    parsedUrl = requestLineMatch[2];
+    cursor = 1;
+  }
+
+  const rest = lines.slice(cursor);
+  const separatorIndex = rest.findIndex((line) => line.trim() === "");
+  const headerLines = separatorIndex >= 0 ? rest.slice(0, separatorIndex) : rest;
+  const bodyLines = separatorIndex >= 0 ? rest.slice(separatorIndex + 1) : [];
+  return {
+    hasRequestLine,
+    method: parsedMethod,
+    url: parsedUrl,
+    headers: headerLines.join("\n"),
+    body: bodyLines.join("\n")
+  };
+};
+
+const renderRepeaterRawRequest = (entry: RepeaterEntry) => {
+  repeaterRequestRawInput.value = buildRawRequestText(entry);
+};
+
+const applyRawRequestToActiveRepeater = (strict = false): string | null => {
+  const active = getActiveRepeaterEntry();
+  if (!active) return "No active repeater request.";
+  const parsed = parseRawRequestText(repeaterRequestRawInput.value);
+  if (strict) {
+    if (!parsed.hasRequestLine) {
+      return "Invalid raw request: first line must be 'METHOD URL HTTP/version'.";
+    }
+    if (!parsed.method) {
+      return "Invalid raw request: unsupported HTTP method.";
+    }
+    if (!parsed.url || !parsed.url.trim()) {
+      return "Invalid raw request: request URL is required.";
+    }
+  }
+  if (parsed.method) {
+    active.method = parsed.method;
+  }
+  if (parsed.url !== undefined && parsed.url.trim()) {
+    active.url = parsed.url.trim();
+  }
+  const normalized = normalizeRepeaterRequestParts(parsed.headers, parsed.body);
+  active.headers = normalized.headers;
+  active.body = normalized.body;
+  repeaterMethodInput.value = active.method;
+  repeaterUrlInput.value = active.url;
+  renderRepeaterHeaderRows(active.headers);
+  repeaterBodyInput.value = formatJsonIfPossible(active.body);
+  return null;
+};
+
+const renderRepeaterRequestTab = () => {
+  const rawActive = activeRepeaterRequestTab === "raw";
+  const headersActive = activeRepeaterRequestTab === "headers";
+  const bodyActive = activeRepeaterRequestTab === "body";
+  repeaterRequestRawTabBtn.classList.toggle("is-active", rawActive);
+  repeaterRequestHeadersTabBtn.classList.toggle("is-active", headersActive);
+  repeaterRequestBodyTabBtn.classList.toggle("is-active", bodyActive);
+  repeaterRequestRawPane.classList.toggle("hidden", !rawActive);
+  repeaterRequestHeadersPane.classList.toggle("hidden", !headersActive);
+  repeaterRequestBodyPane.classList.toggle("hidden", !bodyActive);
+};
+
+interface RepeaterHeaderRow {
+  key: string;
+  value: string;
+}
+
+const escapeAttr = (value: string): string =>
+  value.replaceAll("&", "&amp;").replaceAll("\"", "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+
+const formatResponseText = (statusLine: string, headersText: string, bodyText: string): string => {
+  const formattedBody = formatJsonIfPossible(bodyText);
+  const lines: string[] = [statusLine.trim()];
+  if (headersText.trim()) {
+    lines.push(headersText.trim());
+  }
+  if (formattedBody) {
+    lines.push("", formattedBody);
+  }
+  return lines.join("\n");
+};
+
+const formatResponseHeadersText = (headersObj: Record<string, string>): string =>
+  Object.entries(headersObj)
+    .map(([key, value]) => `${key}: ${value}`)
+    .join("\n");
+
+const formatRequestHeadersText = (headersObj: Record<string, string>): string =>
+  Object.entries(headersObj)
+    .map(([key, value]) => `${key}: ${value}`)
+    .join("\n");
+
+const applyRedirectMethodTransform = (status: number, currentMethod: HttpMethod): HttpMethod => {
+  if (status === 303) {
+    return "GET";
+  }
+  if ((status === 301 || status === 302) && !["GET", "HEAD"].includes(currentMethod)) {
+    return "GET";
+  }
+  return currentMethod;
+};
+
+const setupRepeaterResize = () => {
+  const minSectionHeight = 160;
+  repeaterSplitHandle.addEventListener("mousedown", (event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const startY = event.clientY;
+    const requestHeight = repeaterRequestSection.getBoundingClientRect().height;
+    const responseHeight = repeaterResponseSection.getBoundingClientRect().height;
+    const totalHeight = requestHeight + responseHeight;
+
+    const onDrag = (moveEvent: MouseEvent) => {
+      const delta = moveEvent.clientY - startY;
+      const nextRequestHeight = Math.max(
+        minSectionHeight,
+        Math.min(totalHeight - minSectionHeight, requestHeight + delta)
+      );
+      const nextResponseHeight = totalHeight - nextRequestHeight;
+      repeaterLayout.style.setProperty("--repeater-request-height", `${nextRequestHeight}px`);
+      repeaterLayout.style.setProperty("--repeater-response-height", `${nextResponseHeight}px`);
+    };
+
+    const onStop = () => {
+      window.removeEventListener("mousemove", onDrag);
+      window.removeEventListener("mouseup", onStop);
+    };
+
+    window.addEventListener("mousemove", onDrag);
+    window.addEventListener("mouseup", onStop);
+  });
+};
+
+const executeRequestWithFlow = async (
+  method: HttpMethod,
+  url: string,
+  headersInput: Record<string, string>,
+  bodyInput: string
+): Promise<{ flowSteps: RepeaterFlowStep[]; finalRes: Response; finalHeaders: Record<string, string>; finalText: string }> => {
+  const flowSteps: RepeaterFlowStep[] = [];
+  let currentMethod: HttpMethod = method;
+  let currentUrl = url;
+  let currentBody = bodyInput;
+  const maxRedirects = 10;
+  let finalRes: Response | null = null;
+  let finalHeaders: Record<string, string> = {};
+  let finalText = "";
+
+  for (let hop = 0; hop <= maxRedirects; hop += 1) {
+    const applied = secretsFeature.applySecretsToRequest(currentUrl, headersInput);
+    const init: RequestInit = { method: currentMethod, headers: applied.headers, redirect: "manual" };
+    const allowsBody = !["GET", "DELETE", "HEAD", "OPTIONS"].includes(currentMethod);
+    if (allowsBody && currentBody.trim()) {
+      init.body = currentBody;
+    }
+
+    const started = performance.now();
+    const res = await fetch(applied.url, init);
+    const elapsed = performance.now() - started;
+    const headersObj: Record<string, string> = {};
+    res.headers.forEach((value, key) => {
+      headersObj[key] = value;
+    });
+    const text = await res.text();
+
+    flowSteps.push({
+      requestMethod: currentMethod,
+      requestUrl: applied.url,
+      requestHeaders: formatRequestHeadersText(applied.headers),
+      requestBody: currentBody,
+      responseStatus: res.status,
+      responseStatusText: res.statusText || (res.type === "opaqueredirect" ? "Redirect (opaque)" : ""),
+      responseHeaders: formatResponseHeadersText(headersObj),
+      responseBody: text,
+      elapsedMs: elapsed
+    });
+
+    finalRes = res;
+    finalHeaders = headersObj;
+    finalText = text;
+
+    // Cross-origin redirects can be opaque in extension fetch (status 0, type opaqueredirect).
+    // Fallback to a follow request to at least expose a navigable pre/final pair.
+    if (res.type === "opaqueredirect" || res.status === 0) {
+      const followInit: RequestInit = { method: currentMethod, headers: applied.headers, redirect: "follow" };
+      if (allowsBody && currentBody.trim()) {
+        followInit.body = currentBody;
+      }
+      const followStarted = performance.now();
+      const followRes = await fetch(applied.url, followInit);
+      const followElapsed = performance.now() - followStarted;
+      const followHeaders: Record<string, string> = {};
+      followRes.headers.forEach((value, key) => {
+        followHeaders[key] = value;
+      });
+      const followText = await followRes.text();
+
+      const redirected = followRes.redirected || followRes.url !== applied.url;
+      if (redirected) {
+        flowSteps.push({
+          requestMethod: currentMethod,
+          requestUrl: followRes.url || applied.url,
+          requestHeaders: formatRequestHeadersText(applied.headers),
+          requestBody: currentBody,
+          responseStatus: followRes.status,
+          responseStatusText: followRes.statusText,
+          responseHeaders: formatResponseHeadersText(followHeaders),
+          responseBody: followText,
+          elapsedMs: followElapsed
+        });
+      } else {
+        flowSteps[flowSteps.length - 1] = {
+          requestMethod: currentMethod,
+          requestUrl: applied.url,
+          requestHeaders: formatRequestHeadersText(applied.headers),
+          requestBody: currentBody,
+          responseStatus: followRes.status,
+          responseStatusText: followRes.statusText,
+          responseHeaders: formatResponseHeadersText(followHeaders),
+          responseBody: followText,
+          elapsedMs: followElapsed
+        };
+      }
+
+      finalRes = followRes;
+      finalHeaders = followHeaders;
+      finalText = followText;
+      break;
+    }
+
+    const isRedirectStatus = res.status >= 300 && res.status < 400;
+    if (!isRedirectStatus) break;
+    const location = res.headers.get("location");
+    if (!location) break;
+    const nextUrl = new URL(location, applied.url).toString();
+    currentMethod = applyRedirectMethodTransform(res.status, currentMethod);
+    if (["GET", "HEAD"].includes(currentMethod)) {
+      currentBody = "";
+    }
+    currentUrl = nextUrl;
+  }
+
+  if (!finalRes) {
+    throw new Error("Request failed before receiving a response.");
+  }
+
+  return { flowSteps, finalRes, finalHeaders, finalText };
+};
+
+const renderRepeaterRequestFromFlowStep = (step: RepeaterFlowStep) => {
+  repeaterMethodInput.value = step.requestMethod;
+  repeaterUrlInput.value = step.requestUrl;
+  renderRepeaterHeaderRows(step.requestHeaders);
+  repeaterBodyInput.value = formatJsonIfPossible(step.requestBody);
+  const rawLines = [`${step.requestMethod} ${step.requestUrl} HTTP/?`];
+  if (step.requestHeaders.trim()) {
+    rawLines.push(step.requestHeaders.trim());
+  }
+  if (step.requestBody) {
+    rawLines.push("", formatJsonIfPossible(step.requestBody));
+  }
+  repeaterRequestRawInput.value = rawLines.join("\n");
+};
+
+const renderRepeaterFlowStep = (entry: RepeaterEntry) => {
+  const flow = entry.flowSteps ?? [];
+  const index = Math.max(0, Math.min(entry.activeFlowIndex ?? flow.length - 1, flow.length - 1));
+  if (flow.length === 0) {
+    repeaterFlowNav.classList.add("hidden");
+    repeaterPrevFlowBtn.disabled = true;
+    repeaterNextFlowBtn.disabled = true;
+    repeaterLastFlowBtn.disabled = true;
+    repeaterResponseBody.textContent = entry.responseBody ?? "";
+    return;
+  }
+  entry.activeFlowIndex = index;
+  repeaterFlowNav.classList.remove("hidden");
+  const step = flow[index];
+  repeaterPrevFlowBtn.disabled = index === 0;
+  repeaterNextFlowBtn.disabled = index >= flow.length - 1;
+  repeaterLastFlowBtn.disabled = index >= flow.length - 1;
+  renderRepeaterRequestFromFlowStep(step);
+  const responseLines: string[] = [];
+  if (step.responseStatus > 0) {
+    responseLines.push(`${step.responseStatus} ${step.responseStatusText}`.trim());
+  } else if (step.responseStatusText) {
+    responseLines.push(step.responseStatusText);
+  }
+  if (step.responseHeaders.trim()) {
+    responseLines.push(step.responseHeaders.trim());
+  }
+  if (step.responseBody) {
+    responseLines.push("", formatJsonIfPossible(step.responseBody));
+  }
+  repeaterResponseBody.textContent = responseLines.join("\n").trim();
+};
+
+const normalizeRepeaterRequestParts = (
+  headersText: string,
+  bodyText: string
+): { headers: string; body: string } => {
+  let headers = headersText || "";
+  let body = bodyText || "";
+
+  const rawRequestLinePattern = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|WS)\s+\S+\s+HTTP\/\S+$/i;
+  const headerLines = headers.split(/\r?\n/);
+  if (headerLines.length > 0 && rawRequestLinePattern.test(headerLines[0].trim())) {
+    headerLines.shift();
+    headers = headerLines.join("\n");
+  }
+
+  const splitIndex = headers.search(/\r?\n\r?\n/);
+  if (splitIndex >= 0) {
+    const headerPart = headers.slice(0, splitIndex);
+    const leakedBodyPart = headers.slice(splitIndex).replace(/^\r?\n\r?\n/, "");
+    headers = headerPart;
+    body = body ? `${leakedBodyPart}\n${body}` : leakedBodyPart;
+  }
+
+  const cleanedHeaderLines = headers
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && line.includes(":"));
+
+  return {
+    headers: cleanedHeaderLines.join("\n"),
+    body: body
+  };
+};
+
+const getRepeaterHeaderRowsFromText = (headersText: string): RepeaterHeaderRow[] => {
+  const parsed = parseHeaders(headersText);
+  const rows = Object.entries(parsed).map(([key, value]) => ({ key, value }));
+  return rows.length > 0 ? rows : [{ key: "", value: "" }];
+};
+
+const renderRepeaterHeaderRows = (headersText: string) => {
+  const rows = getRepeaterHeaderRowsFromText(headersText);
+  repeaterHeadersTableBody.innerHTML = rows
+    .map(
+      (row, index) => `<tr data-repeater-header-index="${index}">
+        <td><input type="text" data-repeater-header-field="key" value="${escapeAttr(row.key)}" placeholder="Header name" /></td>
+        <td><input type="text" data-repeater-header-field="value" value="${escapeAttr(row.value)}" placeholder="Header value" /></td>
+        <td><button type="button" data-repeater-header-action="remove" title="Remove header">&times;</button></td>
+      </tr>`
+    )
+    .join("");
+};
+
+const getRepeaterHeadersTextFromTable = (): string => {
+  const rows = Array.from(repeaterHeadersTableBody.querySelectorAll("tr"));
+  const parts: string[] = [];
+  rows.forEach((row) => {
+    const keyInput = row.querySelector<HTMLInputElement>('input[data-repeater-header-field="key"]');
+    const valueInput = row.querySelector<HTMLInputElement>('input[data-repeater-header-field="value"]');
+    const key = keyInput?.value.trim() ?? "";
+    const value = valueInput?.value ?? "";
+    if (!key) return;
+    parts.push(`${key}: ${value}`);
+  });
+  return parts.join("\n");
+};
+
+const addRepeaterHeaderRow = (row: RepeaterHeaderRow = { key: "", value: "" }) => {
+  const index = repeaterHeadersTableBody.querySelectorAll("tr").length;
+  const html = `<tr data-repeater-header-index="${index}">
+    <td><input type="text" data-repeater-header-field="key" value="${escapeAttr(row.key)}" placeholder="Header name" /></td>
+    <td><input type="text" data-repeater-header-field="value" value="${escapeAttr(row.value)}" placeholder="Header value" /></td>
+    <td><button type="button" data-repeater-header-action="remove" title="Remove header">&times;</button></td>
+  </tr>`;
+  repeaterHeadersTableBody.insertAdjacentHTML("beforeend", html);
+};
+
 const renderRepeater = () => {
   if (repeaterEntries.length === 0) {
     repeaterTabs.innerHTML = "";
     repeaterView.classList.add("hidden");
     repeaterEmptyState.classList.remove("hidden");
     activeRepeaterEntryId = null;
+    repeaterPrevFlowBtn.disabled = true;
+    repeaterNextFlowBtn.disabled = true;
+    repeaterLastFlowBtn.disabled = true;
     return;
   }
 
@@ -2307,12 +2817,19 @@ const renderRepeater = () => {
   const active = getActiveRepeaterEntry();
   if (!active) return;
 
+  const normalized = normalizeRepeaterRequestParts(active.headers, active.body);
+  active.headers = normalized.headers;
+  active.body = normalized.body;
+
   repeaterEmptyState.classList.add("hidden");
   repeaterView.classList.remove("hidden");
   repeaterMethodInput.value = active.method;
   repeaterUrlInput.value = active.url;
-  repeaterHeadersInput.value = active.headers;
-  repeaterBodyInput.value = active.body;
+  renderRepeaterHeaderRows(active.headers);
+  repeaterBodyInput.value = formatJsonIfPossible(active.body);
+  renderRepeaterRawRequest(active);
+  renderRepeaterFlowStep(active);
+  renderRepeaterRequestTab();
 };
 
 const addEndpointToRepeater = (endpoint: DiscoveredEndpoint) => {
@@ -2327,13 +2844,83 @@ const addEndpointToRepeater = (endpoint: DiscoveredEndpoint) => {
   const savedBody = endpointLastRequestBodies.get(endpoint.id);
   const savedHeaders = endpointLastRequestHeaders.get(endpoint.id);
   const bodyDefault = savedBody !== undefined ? savedBody : ["POST", "PUT", "PATCH"].includes(method) ? "{}" : "";
+  const normalized = normalizeRepeaterRequestParts(savedHeaders ?? "", bodyDefault);
   const entry: RepeaterEntry = {
     id: crypto.randomUUID(),
     name: `${method} ${endpoint.url}`,
     method,
     url: endpoint.url,
-    headers: savedHeaders ?? "",
-    body: bodyDefault
+    headers: normalized.headers,
+    body: normalized.body,
+    responseMeta: "",
+    responseBody: "",
+    flowSteps: [],
+    activeFlowIndex: 0
+  };
+  repeaterEntries.push(entry);
+  activeRepeaterEntryId = entry.id;
+  renderRepeater();
+};
+
+const addProxyEntryToRepeater = (proxyEntry: ProxyTrafficEntry) => {
+  const methodCandidate = proxyEntry.method.toUpperCase() as HttpMethod;
+  const method = METHOD_SET.has(methodCandidate) ? methodCandidate : "GET";
+  const responseStatus = proxyEntry.status ? String(proxyEntry.status) : "-";
+  const responseStatusText = proxyEntry.statusText ? ` ${proxyEntry.statusText}` : "";
+  const responseStatusLine = `${responseStatus}${responseStatusText}`.trim();
+  const responseMetaParts = [`${responseStatus}${responseStatusText}`];
+  if (Number.isFinite(proxyEntry.durationMs)) {
+    responseMetaParts.push(`in ${proxyEntry.durationMs.toFixed(0)}ms`);
+  }
+  const existing = repeaterEntries.find((entry) => entry.method === method && entry.url === proxyEntry.url);
+  const normalizedRequest = normalizeRepeaterRequestParts(proxyEntry.requestHeaders, proxyEntry.requestBody);
+  if (existing) {
+    existing.headers = normalizedRequest.headers;
+    existing.body = normalizedRequest.body;
+    existing.responseMeta = responseMetaParts.join(" ");
+    existing.responseBody = formatResponseText(responseStatusLine, proxyEntry.responseHeaders, proxyEntry.responseBody);
+    existing.flowSteps = [
+      {
+        requestMethod: method,
+        requestUrl: proxyEntry.url,
+        requestHeaders: normalizedRequest.headers,
+        requestBody: normalizedRequest.body,
+        responseStatus: proxyEntry.status,
+        responseStatusText: proxyEntry.statusText,
+        responseHeaders: proxyEntry.responseHeaders,
+        responseBody: proxyEntry.responseBody,
+        elapsedMs: Number.isFinite(proxyEntry.durationMs) ? proxyEntry.durationMs : 0
+      }
+    ];
+    existing.activeFlowIndex = 0;
+    activeRepeaterEntryId = existing.id;
+    renderRepeater();
+    return;
+  }
+
+  const entry: RepeaterEntry = {
+    id: crypto.randomUUID(),
+    name: `${method} ${proxyEntry.url}`,
+    method,
+    url: proxyEntry.url,
+    headers: normalizedRequest.headers,
+    body: normalizedRequest.body,
+    responseMeta: responseMetaParts.join(" "),
+    responseBody: formatResponseText(responseStatusLine, proxyEntry.responseHeaders, proxyEntry.responseBody),
+    flowSteps: [
+      {
+        requestMethod: method,
+        requestUrl: proxyEntry.url,
+        requestHeaders: normalizedRequest.headers,
+        requestBody: normalizedRequest.body,
+        responseStatus: proxyEntry.status,
+        responseStatusText: proxyEntry.statusText,
+        responseHeaders: proxyEntry.responseHeaders,
+        responseBody: proxyEntry.responseBody,
+        elapsedMs: Number.isFinite(proxyEntry.durationMs) ? proxyEntry.durationMs : 0
+      }
+    ],
+    activeFlowIndex: 0
   };
   repeaterEntries.push(entry);
   activeRepeaterEntryId = entry.id;
@@ -2435,6 +3022,20 @@ renameGroupBtn.addEventListener("click", () => {
 const hideEndpointContextMenu = () => {
   endpointContextMenu.classList.add("hidden");
   contextMenuEndpointId = null;
+  contextMenuProxyEntryId = null;
+};
+
+const isEditableTarget = (target: EventTarget | null): target is HTMLElement => {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target instanceof HTMLInputElement) return true;
+  if (target instanceof HTMLTextAreaElement) return true;
+  return target.isContentEditable;
+};
+
+const showEndpointContextMenu = (x: number, y: number) => {
+  endpointContextMenu.classList.remove("hidden");
+  endpointContextMenu.style.left = `${x}px`;
+  endpointContextMenu.style.top = `${y}px`;
 };
 
 testEndpointsList.addEventListener("contextmenu", (event) => {
@@ -2445,9 +3046,8 @@ testEndpointsList.addEventListener("contextmenu", (event) => {
   if (!endpointId) return;
   event.preventDefault();
   contextMenuEndpointId = endpointId;
-  endpointContextMenu.classList.remove("hidden");
-  endpointContextMenu.style.left = `${event.clientX}px`;
-  endpointContextMenu.style.top = `${event.clientY}px`;
+  contextMenuProxyEntryId = null;
+  showEndpointContextMenu(event.clientX, event.clientY);
 });
 
 testResultsList.addEventListener("contextmenu", (event) => {
@@ -2458,9 +3058,20 @@ testResultsList.addEventListener("contextmenu", (event) => {
   if (!endpointId) return;
   event.preventDefault();
   contextMenuEndpointId = endpointId;
-  endpointContextMenu.classList.remove("hidden");
-  endpointContextMenu.style.left = `${event.clientX}px`;
-  endpointContextMenu.style.top = `${event.clientY}px`;
+  contextMenuProxyEntryId = null;
+  showEndpointContextMenu(event.clientX, event.clientY);
+});
+
+proxyTrafficList.addEventListener("contextmenu", (event) => {
+  const target = event.target as HTMLElement;
+  const row = target.closest<HTMLElement>("[data-proxy-entry-id]");
+  if (!row) return;
+  const proxyEntryId = row.dataset.proxyEntryId;
+  if (!proxyEntryId) return;
+  event.preventDefault();
+  contextMenuEndpointId = null;
+  contextMenuProxyEntryId = proxyEntryId;
+  showEndpointContextMenu(event.clientX, event.clientY);
 });
 
 testEndpointsList.addEventListener("change", (event) => {
@@ -2536,29 +3147,113 @@ window.addEventListener("blur", () => {
   hideEndpointContextMenu();
 });
 
+document.addEventListener("keydown", (event) => {
+  if (!isEditableTarget(event.target)) return;
+  const key = event.key.toLowerCase();
+  const isUndo = (event.ctrlKey || event.metaKey) && !event.shiftKey && key === "z";
+  const isRedo =
+    (event.ctrlKey || event.metaKey) &&
+    ((key === "y" && !event.shiftKey) || (key === "z" && event.shiftKey));
+  if (!isUndo && !isRedo) return;
+  event.preventDefault();
+  document.execCommand(isUndo ? "undo" : "redo");
+});
+
 sendToRepeaterMenuItem.addEventListener("click", () => {
-  if (!contextMenuEndpointId) return;
-  const endpoint = discoveredEndpoints.find((item) => item.id === contextMenuEndpointId);
+  const endpointId = contextMenuEndpointId;
+  const proxyEntryId = contextMenuProxyEntryId;
   hideEndpointContextMenu();
-  if (!endpoint) return;
-  addEndpointToRepeater(endpoint);
+  if (endpointId) {
+    const endpoint = discoveredEndpoints.find((item) => item.id === endpointId);
+    if (!endpoint) return;
+    addEndpointToRepeater(endpoint);
+  } else if (proxyEntryId) {
+    const proxyEntry = proxyTrafficEntries.find((entry) => entry.id === proxyEntryId);
+    if (!proxyEntry) return;
+    addProxyEntryToRepeater(proxyEntry);
+  } else {
+    return;
+  }
   setActivePage("repeater");
 });
 
 const syncActiveRepeaterFromInputs = () => {
   const active = getActiveRepeaterEntry();
   if (!active) return;
+  if (activeRepeaterRequestTab === "raw") {
+    applyRawRequestToActiveRepeater();
+    return;
+  }
   const methodCandidate = repeaterMethodInput.value.toUpperCase() as HttpMethod;
   active.method = METHOD_SET.has(methodCandidate) ? methodCandidate : "GET";
   active.url = repeaterUrlInput.value.trim();
-  active.headers = repeaterHeadersInput.value;
+  active.headers = getRepeaterHeadersTextFromTable();
   active.body = repeaterBodyInput.value;
+  renderRepeaterRawRequest(active);
 };
 
 repeaterMethodInput.addEventListener("change", syncActiveRepeaterFromInputs);
 repeaterUrlInput.addEventListener("input", syncActiveRepeaterFromInputs);
-repeaterHeadersInput.addEventListener("input", syncActiveRepeaterFromInputs);
 repeaterBodyInput.addEventListener("input", syncActiveRepeaterFromInputs);
+repeaterRequestRawInput.addEventListener("input", () => {
+  if (activeRepeaterRequestTab !== "raw") return;
+  applyRawRequestToActiveRepeater(false);
+});
+repeaterRequestRawTabBtn.addEventListener("click", () => {
+  activeRepeaterRequestTab = "raw";
+  renderRepeaterRequestTab();
+});
+repeaterRequestHeadersTabBtn.addEventListener("click", () => {
+  if (activeRepeaterRequestTab === "raw") {
+    applyRawRequestToActiveRepeater(false);
+  }
+  activeRepeaterRequestTab = "headers";
+  renderRepeaterRequestTab();
+});
+repeaterRequestBodyTabBtn.addEventListener("click", () => {
+  if (activeRepeaterRequestTab === "raw") {
+    applyRawRequestToActiveRepeater(false);
+  }
+  activeRepeaterRequestTab = "body";
+  renderRepeaterRequestTab();
+});
+repeaterPrevFlowBtn.addEventListener("click", () => {
+  const active = getActiveRepeaterEntry();
+  if (!active || !active.flowSteps || active.flowSteps.length === 0) return;
+  active.activeFlowIndex = Math.max(0, (active.activeFlowIndex ?? 0) - 1);
+  renderRepeaterFlowStep(active);
+});
+repeaterNextFlowBtn.addEventListener("click", () => {
+  const active = getActiveRepeaterEntry();
+  if (!active || !active.flowSteps || active.flowSteps.length === 0) return;
+  active.activeFlowIndex = Math.min(
+    active.flowSteps.length - 1,
+    (active.activeFlowIndex ?? active.flowSteps.length - 1) + 1
+  );
+  renderRepeaterFlowStep(active);
+});
+repeaterLastFlowBtn.addEventListener("click", () => {
+  const active = getActiveRepeaterEntry();
+  if (!active || !active.flowSteps || active.flowSteps.length === 0) return;
+  active.activeFlowIndex = active.flowSteps.length - 1;
+  renderRepeaterFlowStep(active);
+});
+repeaterHeadersTableBody.addEventListener("input", syncActiveRepeaterFromInputs);
+repeaterHeadersTableBody.addEventListener("click", (event) => {
+  const target = event.target as HTMLElement;
+  const removeBtn = target.closest<HTMLButtonElement>('[data-repeater-header-action="remove"]');
+  if (!removeBtn) return;
+  const row = removeBtn.closest("tr");
+  row?.remove();
+  if (repeaterHeadersTableBody.querySelectorAll("tr").length === 0) {
+    addRepeaterHeaderRow();
+  }
+  syncActiveRepeaterFromInputs();
+});
+repeaterAddHeaderBtn.addEventListener("click", () => {
+  addRepeaterHeaderRow();
+  syncActiveRepeaterFromInputs();
+});
 
 repeaterTabs.addEventListener("click", (event) => {
   const target = event.target as HTMLElement;
@@ -2569,9 +3264,10 @@ repeaterTabs.addEventListener("click", (event) => {
     repeaterEntries = repeaterEntries.filter((entry) => entry.id !== closeId);
     if (activeRepeaterEntryId === closeId) {
       activeRepeaterEntryId = repeaterEntries[0]?.id ?? null;
-      repeaterResponseMeta.textContent = "";
-      repeaterResponseHeaders.textContent = "";
       repeaterResponseBody.textContent = "";
+      repeaterPrevFlowBtn.disabled = true;
+      repeaterNextFlowBtn.disabled = true;
+      repeaterLastFlowBtn.disabled = true;
     }
     renderRepeater();
     return;
@@ -2589,27 +3285,44 @@ repeaterTabs.addEventListener("click", (event) => {
 repeaterSendBtn.addEventListener("click", async () => {
   const active = getActiveRepeaterEntry();
   if (!active) return;
-  syncActiveRepeaterFromInputs();
+  if (activeRepeaterRequestTab === "raw") {
+    const rawError = applyRawRequestToActiveRepeater(true);
+    if (rawError) {
+      repeaterResponseBody.textContent = `Request Error\n\n${rawError}`;
+      return;
+    }
+  } else {
+    syncActiveRepeaterFromInputs();
+  }
 
   if (!active.url) {
-    repeaterResponseMeta.textContent = "Request URL is required.";
+    repeaterResponseBody.textContent = "Request Error\n\nRequest URL is required.";
     return;
   }
 
-  repeaterResponseMeta.textContent = "Sending...";
-  repeaterResponseHeaders.textContent = "";
-  repeaterResponseBody.textContent = "";
+  repeaterResponseBody.textContent = "Sending...";
+  active.responseMeta = "";
+  active.responseBody = "";
+  const existingFlow = active.flowSteps ? [...active.flowSteps] : [];
 
   try {
     const headers = parseHeaders(active.headers);
-    const { res, elapsed, headersObj, text } = await executeRequest(active.method, active.url, headers, active.body);
-    repeaterResponseMeta.textContent = `${res.status} ${res.statusText} in ${elapsed.toFixed(0)}ms`;
-    repeaterResponseHeaders.textContent = JSON.stringify(headersObj, null, 2);
-    try {
-      repeaterResponseBody.textContent = JSON.stringify(JSON.parse(text), null, 2);
-    } catch {
-      repeaterResponseBody.textContent = text;
-    }
+    const { flowSteps, finalRes, finalHeaders, finalText } = await executeRequestWithFlow(
+      active.method,
+      active.url,
+      headers,
+      active.body
+    );
+    const last = flowSteps[flowSteps.length - 1];
+    active.responseMeta = `${last.responseStatus} ${last.responseStatusText} in ${last.elapsedMs.toFixed(0)}ms`;
+    active.responseBody = formatResponseText(
+      `${last.responseStatus} ${last.responseStatusText}`.trim(),
+      last.responseHeaders,
+      last.responseBody
+    );
+    active.flowSteps = [...existingFlow, ...flowSteps];
+    active.activeFlowIndex = active.flowSteps.length - 1;
+    renderRepeaterFlowStep(active);
 
     const matchedEndpoint = discoveredEndpoints.find(
       (endpoint) => endpoint.method === active.method && endpoint.url === active.url
@@ -2620,14 +3333,14 @@ repeaterSendBtn.addEventListener("click", async () => {
       const summary = await requestEndpointTestAnalysis(
         matchedEndpoint,
         active.body,
-        res.status,
-        headersObj,
-        text
+        finalRes.status,
+        finalHeaders,
+        finalText
       );
       endpointTestResults.set(matchedEndpoint.id, {
         endpointId: matchedEndpoint.id,
-        status: res.status,
-        elapsedMs: elapsed,
+        status: finalRes.status,
+        elapsedMs: last.elapsedMs,
         summary
       });
       renderTestEndpointsList();
@@ -2635,8 +3348,22 @@ repeaterSendBtn.addEventListener("click", async () => {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    repeaterResponseMeta.textContent = "Request failed";
-    repeaterResponseBody.textContent = message;
+    active.responseMeta = "Request failed";
+    active.responseBody = message;
+    const errorStep: RepeaterFlowStep = {
+      requestMethod: active.method,
+      requestUrl: active.url,
+      requestHeaders: active.headers,
+      requestBody: active.body,
+      responseStatus: 0,
+      responseStatusText: "Request Error",
+      responseHeaders: "",
+      responseBody: message,
+      elapsedMs: 0
+    };
+    active.flowSteps = [...existingFlow, errorStep];
+    active.activeFlowIndex = active.flowSteps.length - 1;
+    renderRepeaterFlowStep(active);
   }
 });
 
@@ -2844,7 +3571,9 @@ addDiscoveredRoutesBtn.addEventListener("click", () => {
 
 renderDiscoveredEndpoints();
 renderRepeater();
+setupRepeaterResize();
 applyProxyColumnWidths();
+ensureProxyTableHeaderColumns();
 setupProxyColumnResize();
 setupProxyDetailResize();
 renderProxyTraffic();
@@ -3218,7 +3947,7 @@ chrome.devtools.network.onRequestFinished.addListener((entry) => {
     let hasQuery = false;
     try {
       const parsed = new URL(rawUrl);
-      path = parsed.pathname || "/";
+      path = `${parsed.pathname || "/"}${parsed.search || ""}`;
       hasQuery = Boolean(parsed.search && parsed.search.length > 1);
     } catch {}
     const proxyEntryId = crypto.randomUUID();
@@ -3265,13 +3994,18 @@ chrome.devtools.network.onRequestFinished.addListener((entry) => {
       requestBody,
       responseHttpVersion,
       responseHeaders,
-      responseBody: ""
+      responseBody: "",
+      contentLengthBytes: parseContentLengthHeader(responseHeaders)
     });
     if (!isWsTraffic) {
       try {
         entry.getContent((content) => {
+          const text = typeof content === "string" ? content : "";
+          const byteLength = text ? new TextEncoder().encode(text).length : 0;
           updateProxyTrafficEntry(proxyEntryId, {
-            responseBody: typeof content === "string" ? content : ""
+            responseBody: text,
+            contentLengthBytes:
+              parseContentLengthHeader(responseHeaders) ?? (text || byteLength === 0 ? byteLength : null)
           });
         });
       } catch {}
