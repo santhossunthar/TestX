@@ -573,9 +573,11 @@ pre {
 
 .repeater-tabs {
   display: flex;
-  gap: 6px;
+  gap: 0;
   overflow-x: auto;
-  padding-bottom: 4px;
+  padding: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
 }
 
 .repeater-tab {
@@ -585,13 +587,31 @@ pre {
   align-items: center;
   justify-content: flex-start;
   gap: 8px;
-  padding: 0 8px;
+  height: 34px;
+  padding: 0 12px;
   white-space: nowrap;
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
 }
 
 .repeater-tab.is-active {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 14%, var(--input-bg));
+  background: color-mix(in srgb, var(--input-bg) 84%, white 16%);
+  box-shadow: none;
+  border-bottom: 1px solid var(--input-bg);
+  margin-bottom: -1px;
+  position: relative;
+  z-index: 2;
+}
+
+.repeater-tab.is-active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--input-bg);
 }
 
 .repeater-tab-name {
@@ -621,27 +641,25 @@ pre {
 .repeater-layout {
   display: grid;
   grid-template-rows:
-    auto
-    minmax(260px, var(--repeater-request-height, 1fr))
+    min-content
+    minmax(220px, var(--repeater-request-height, 1.2fr))
     8px
-    minmax(180px, var(--repeater-response-height, 1fr));
+    minmax(220px, var(--repeater-response-height, 1fr));
   gap: 10px;
   height: 100%;
   min-height: 0;
+  overflow: hidden;
+  align-content: start;
 }
 
 .repeater-row {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--input-bg);
-  padding: 8px;
+  padding: 6px 0;
   display: grid;
   gap: 8px;
 }
 
 .repeater-layout > .repeater-row:nth-child(2) {
   min-height: 0;
-  overflow: hidden;
 }
 
 .repeater-split-handle {
@@ -667,16 +685,24 @@ pre {
 }
 
 .page[data-page="repeater"] .panel-card.page-card {
-  height: 100%;
+  height: auto;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  max-height: 100%;
+  padding: 0;
+  overflow: hidden;
+}
+
+.page[data-page="repeater"] .panel-card.page-card > h3 {
+  display: none;
 }
 
 .page[data-page="repeater"] .stack {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
+  gap: 0;
   min-height: 0;
   overflow: hidden;
 }
@@ -686,8 +712,13 @@ pre {
   flex: 0 0 auto;
 }
 
+.page[data-page="repeater"] #repeaterEmptyState {
+  display: none;
+}
+
 .page[data-page="repeater"] #repeaterView {
   flex: 1 1 auto;
+  padding: 10px;
   min-height: 0;
   overflow: hidden;
 }
@@ -695,6 +726,9 @@ pre {
 .repeater-top-row {
   grid-template-columns: 110px minmax(220px, 1fr) auto auto;
   align-items: center;
+  background: var(--surface);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
 }
 
 .repeater-top-row #repeaterMethodInput {
@@ -715,6 +749,7 @@ pre {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  background: transparent;
 }
 
 .repeater-row-head #repeaterAddHeaderBtn {
@@ -743,22 +778,50 @@ pre {
 
 .repeater-request-row {
   min-height: 0;
+  overflow: hidden;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  gap: 0;
 }
 
 .repeater-request-tabs {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
 }
 
 .repeater-request-tab {
   width: auto;
   min-width: 72px;
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
 }
 
 .repeater-request-tab.is-active {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 14%, var(--input-bg));
+  background: var(--input-bg);
+  box-shadow: none;
+  border-bottom: 1px solid var(--input-bg);
+  margin-bottom: -1px;
+  position: relative;
+  z-index: 2;
+}
+
+.repeater-request-tab.is-active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--input-bg);
 }
 
 .repeater-request-pane {
@@ -766,13 +829,30 @@ pre {
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
+  overflow: hidden;
+}
+
+.repeater-response-pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 #repeaterRequestHeadersPane {
   min-height: 190px;
 }
 
+#repeaterRequestHeadersPane > .repeater-row-head {
+  display: none;
+}
+
 .repeater-request-pane.hidden {
+  display: none;
+}
+
+.repeater-response-pane.hidden {
   display: none;
 }
 
@@ -780,6 +860,7 @@ pre {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
+  resize: none;
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px;
@@ -844,10 +925,32 @@ pre {
   min-height: 0;
   height: auto;
   overflow: auto;
+  resize: none;
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px;
   background: var(--surface);
+}
+
+#repeaterResponseHeadersOutput,
+#repeaterResponseOnlyBody {
+  margin: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  overflow: auto;
+  resize: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  background: var(--surface);
+}
+
+#repeaterResponseSection {
+  min-height: 0;
+  overflow: hidden;
+  padding-top: 8px;
+  gap: 0;
 }
 
 .context-menu {
@@ -1163,14 +1266,10 @@ pre {
 
   .repeater-layout {
     grid-template-rows:
-      auto
-      minmax(160px, var(--repeater-request-height, 1fr))
+      min-content
+      minmax(170px, var(--repeater-request-height, 1fr))
       8px
-      minmax(160px, var(--repeater-response-height, 1fr));
-  }
-
-  #repeaterBodyInput {
-    resize: none;
+      minmax(170px, var(--repeater-response-height, 1fr));
   }
 
   .repeater-top-row #repeaterSendBtn {

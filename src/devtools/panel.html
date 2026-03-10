@@ -252,12 +252,9 @@
 
         <section class="page" data-page="repeater">
           <section class="panel-card page-card">
-            <h3>Repeater</h3>
             <div class="stack">
               <div id="repeaterTabs" class="repeater-tabs"></div>
-              <div id="repeaterEmptyState" class="helper-text">
-                No endpoint in repeater. Right-click an endpoint in Test Endpoints and choose Send to Repeater.
-              </div>
+              <div id="repeaterEmptyState" class="helper-text"></div>
               <div id="repeaterView" class="repeater-view hidden">
                 <div id="repeaterLayout" class="repeater-pane repeater-layout">
                   <div class="repeater-row repeater-top-row">
@@ -269,6 +266,7 @@
                       <option>DELETE</option>
                       <option>HEAD</option>
                       <option>OPTIONS</option>
+                      <option>CONNECT</option>
                     </select>
                     <input id="repeaterUrlInput" type="url" placeholder="https://api.example.com/items" />
                     <button id="repeaterSendBtn" type="button">Send</button>
@@ -316,8 +314,23 @@
                   <div id="repeaterSplitHandle" class="repeater-split-handle" aria-hidden="true"></div>
 
                   <div id="repeaterResponseSection" class="repeater-row repeater-scroll-row">
-                    <h4>Response</h4>
-                    <pre id="repeaterResponseBody"></pre>
+                    <div class="repeater-row-head">
+                      <h4>Response</h4>
+                      <div class="repeater-request-tabs">
+                        <button id="repeaterResponseRawTabBtn" type="button" class="repeater-request-tab is-active">Raw</button>
+                        <button id="repeaterResponseHeadersTabBtn" type="button" class="repeater-request-tab">Headers</button>
+                        <button id="repeaterResponseBodyTabBtn" type="button" class="repeater-request-tab">Body</button>
+                      </div>
+                    </div>
+                    <div id="repeaterResponseRawPane" class="repeater-response-pane">
+                      <pre id="repeaterResponseBody"></pre>
+                    </div>
+                    <div id="repeaterResponseHeadersPane" class="repeater-response-pane hidden">
+                      <pre id="repeaterResponseHeadersOutput"></pre>
+                    </div>
+                    <div id="repeaterResponseBodyPane" class="repeater-response-pane hidden">
+                      <pre id="repeaterResponseOnlyBody"></pre>
+                    </div>
                   </div>
                 </div>
               </div>
