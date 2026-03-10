@@ -161,6 +161,7 @@
               <div class="proxy-tabbar">
                 <button id="proxyHttpTabBtn" type="button" class="proxy-tab is-active">HTTP</button>
                 <button id="proxyWebSocketTabBtn" type="button" class="proxy-tab">WebSocket</button>
+                <button id="startProxyAutomatedTestingBtn" type="button">Start Automated Testing</button>
                 <button id="clearProxyTrafficBtn" type="button">Clear Traffic</button>
               </div>
               <div class="helper-text">Proxy Mode: Enabled</div>
@@ -551,6 +552,25 @@
         <div class="inline">
           <button id="confirmModalCancelBtn" type="button">Cancel</button>
           <button id="confirmModalConfirmBtn" type="button">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="securityResultModal"
+      class="modal hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="securityResultModalTitle"
+    >
+      <div class="modal-card security-modal-card">
+        <h3 id="securityResultModalTitle">Endpoint Security Analysis</h3>
+        <div id="securityResultModalEndpoint" class="helper-text"></div>
+        <div id="securityResultModalSummary" class="helper-text"></div>
+        <div id="securityResultModalOverview" class="helper-text"></div>
+        <div id="securityResultModalFindings" class="endpoint-list"></div>
+        <div class="inline">
+          <button id="securityResultCloseBtn" type="button">Close</button>
         </div>
       </div>
     </div>

@@ -208,6 +208,14 @@ textarea::-webkit-scrollbar-thumb:hover {
   background: var(--input-bg);
 }
 
+.endpoint-item.is-clickable {
+  cursor: pointer;
+}
+
+.endpoint-item.is-clickable:hover {
+  border-color: var(--accent);
+}
+
 .endpoint-item-head {
   display: flex;
   gap: 8px;
@@ -569,6 +577,53 @@ pre {
 #confirmModalConfirmBtn:hover,
 #confirmModalCancelBtn:hover {
   border-color: var(--accent);
+}
+
+.security-modal-card {
+  width: min(760px, calc(100vw - 24px));
+  max-height: min(82vh, 760px);
+  overflow: auto;
+}
+
+#securityResultModal .inline {
+  justify-content: flex-end;
+}
+
+#securityResultCloseBtn {
+  width: auto;
+  min-width: 90px;
+}
+
+.security-finding {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--input-bg);
+}
+
+.security-severity {
+  display: inline-block;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 8px;
+  line-height: 20px;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.security-severity.high {
+  border-color: #c64747;
+  color: #c64747;
+}
+
+.security-severity.medium {
+  border-color: #b0892f;
+  color: #b0892f;
+}
+
+.security-severity.low {
+  border-color: #3a7f52;
+  color: #3a7f52;
 }
 
 .repeater-tabs {
@@ -994,6 +1049,11 @@ pre {
 }
 
 .proxy-tabbar #clearProxyTrafficBtn {
+  margin-left: 0;
+  width: auto;
+}
+
+.proxy-tabbar #startProxyAutomatedTestingBtn {
   margin-left: auto;
   width: auto;
 }
@@ -1236,6 +1296,10 @@ pre {
   }
 
   .proxy-tabbar #clearProxyTrafficBtn {
+    margin-left: 0;
+  }
+
+  .proxy-tabbar #startProxyAutomatedTestingBtn {
     margin-left: 0;
   }
 
