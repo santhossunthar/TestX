@@ -9,35 +9,542 @@
   <body>
     <header class="toolbar">
       <strong>TestX</strong>
-      <label>
-        Type
-        <select id="typeFilter">
-          <option value="all">All</option>
-          <option value="network">Network</option>
-          <option value="console">Console</option>
-          <option value="storage">Storage</option>
-        </select>
-      </label>
-      <input id="searchInput" type="search" placeholder="Search URL, args, keys..." />
-      <button id="themeToggle" type="button" aria-label="Switch to dark mode" title="Switch to dark mode">
-        <span id="themeIcon" aria-hidden="true">💡</span>
-      </button>
-      <button id="snapshotBtn">Refresh Storage</button>
-      <button id="exportBtn">Export JSON</button>
+      <div class="toolbar-actions">
+        <select id="workspaceSelect" title="Active workspace"></select>
+        <button id="saveWorkspaceBtn" type="button" title="Save active workspace">Save</button>
+        <button id="devRefreshBtn" type="button" title="Reload inspected page and extension">
+          Dev Refresh
+        </button>
+      </div>
     </header>
-    <main>
-      <div id="count"></div>
-      <table>
-        <thead>
-          <tr>
-            <th>Time</th>
-            <th>Type</th>
-            <th>Details</th>
-          </tr>
-        </thead>
-        <tbody id="rows"></tbody>
-      </table>
+
+    <main class="layout">
+      <aside class="nav-panel">
+        <div class="nav-title">Navigation</div>
+        <button class="nav-item is-active" type="button" data-page="site-setup">
+          <span class="nav-icon" aria-hidden="true">&#128188;</span><span>Workspace</span>
+        </button>
+        <button class="nav-item" type="button" data-page="discovery">
+          <span class="nav-icon" aria-hidden="true">&#128269;</span><span>Discovery</span>
+        </button>
+        <button class="nav-item" type="button" data-page="proxy">
+          <span class="nav-icon" aria-hidden="true">&#128246;</span><span>Proxy</span>
+        </button>
+        <button class="nav-item" type="button" data-page="test-endpoints">
+          <span class="nav-icon" aria-hidden="true">&#129514;</span><span>Test Endpoints</span>
+        </button>
+        <button class="nav-item" type="button" data-page="request-headers">
+          <span class="nav-icon" aria-hidden="true">&#128221;</span><span>Request Headers</span>
+        </button>
+        <button class="nav-item" type="button" data-page="test-results">
+          <span class="nav-icon" aria-hidden="true">&#128202;</span><span>Test Results</span>
+        </button>
+        <button class="nav-item" type="button" data-page="manage-endpoints">
+          <span class="nav-icon" aria-hidden="true">&#9881;&#65039;</span><span>Manage Endpoints</span>
+        </button>
+        <button class="nav-item" type="button" data-page="repeater">
+          <span class="nav-icon" aria-hidden="true">&#128257;</span><span>Repeater</span>
+        </button>
+        <button class="nav-item" type="button" data-page="secrets">
+          <span class="nav-icon" aria-hidden="true">&#128273;</span><span>Secrets</span>
+        </button>
+        <button class="nav-item" type="button" data-page="routes">
+          <span class="nav-icon" aria-hidden="true">&#128279;</span><span>Routes</span>
+        </button>
+        <button class="nav-item" type="button" data-page="swagger">
+          <span class="nav-icon" aria-hidden="true">&#128196;</span><span>Swagger Import</span>
+        </button>
+        <button class="nav-item" type="button" data-page="ai-workflow">
+          <span class="nav-icon" aria-hidden="true">&#129302;</span><span>AI Workflow</span>
+        </button>
+        <button class="nav-item" type="button" data-page="settings">
+          <span class="nav-icon" aria-hidden="true">&#9881;&#65039;</span><span>Settings</span>
+        </button>
+      </aside>
+
+      <section class="workspace">
+        <section class="page is-active" data-page="site-setup">
+          <section class="panel-card page-card">
+            <h3>Workspace</h3>
+            <div class="stack">
+              <div class="helper-text">Create new workspace</div>
+              <div class="inline">
+                <input id="workspaceNameInput" type="text" placeholder="Workspace name" />
+                <button id="createWorkspaceBtn" type="button">Create</button>
+              </div>
+              <div id="workspaceStatus" class="helper-text"></div>
+              <div id="workspaceAnalytics" class="helper-text"></div>
+              <div class="workspace-clear-section">
+                <div class="helper-text workspace-clear-label">Clear active workspace data</div>
+                <div class="inline workspace-clear-actions">
+                  <button id="clearWorkspaceBtn" type="button">Clear Workspace</button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section class="page" data-page="discovery">
+          <section class="panel-card page-card">
+            <h3>Discovery</h3>
+            <div class="stack">
+              <h4>Discovery Configuration</h4>
+              <input id="siteBaseUrlInput" type="url" placeholder="https://example.com" />
+              <div class="helper-text">Only base URL is used (origin without subpath).</div>
+              <label>
+                Max pages to crawl
+                <input id="siteMaxPagesInput" type="number" min="1" max="30" step="1" value="6" />
+              </label>
+              <label class="check-row">
+                <input id="passiveDiscoveryEnabledInput" type="checkbox" />
+                <span>Enable passive auto-discovery from runtime network traffic</span>
+              </label>
+              <div class="helper-text">Passive: API-focused capture with less noise.</div>
+              <button id="startSiteTestingBtn" type="button">Start Testing (AI Discover Endpoints)</button>
+              <div id="siteStatus" class="helper-text"></div>
+              <div class="workspace-clear-section">
+                <h4>Proxy Configuration</h4>
+                <label class="check-row">
+                  <input id="proxyDiscoveryEnabledInput" type="checkbox" />
+                  <span>Enable Proxy Mode (discover endpoints from all runtime requests while you navigate)</span>
+                </label>
+                <div class="helper-text">Proxy: maximum coverage, can include non-API noise.</div>
+                <div class="helper-text">No AI needed. Walk through the app and endpoints will be collected automatically.</div>
+              </div>
+              <div class="workspace-clear-section">
+                <h4>Credential-Assisted Discovery</h4>
+                <select id="authModeSelect">
+                  <option value="signin">Sign In</option>
+                  <option value="signup">Sign Up</option>
+                </select>
+                <input id="authEmailInput" type="text" placeholder="Email (optional)" />
+                <input id="authUsernameInput" type="text" placeholder="Username (optional)" />
+                <input id="authPasswordInput" type="password" placeholder="Password" />
+                <input id="authConfirmPasswordInput" type="password" placeholder="Confirm password (for sign up)" />
+                <label class="check-row">
+                  <input id="authRequiresManualStepInput" type="checkbox" />
+                  <span>OTP/manual verification required (I will complete it manually)</span>
+                </label>
+                <button id="runAuthDiscoveryBtn" type="button">Run Auth Flow + Discover</button>
+                <div class="inline">
+                  <button id="continueAuthDiscoveryBtn" type="button" disabled>Continue Discovery After OTP</button>
+                  <button id="cancelAuthSessionBtn" type="button" disabled>Cancel Auth Session</button>
+                </div>
+                <div id="authStatus" class="helper-text"></div>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section class="page" data-page="test-endpoints">
+          <section class="panel-card page-card">
+            <h3>Test Endpoints</h3>
+            <div class="stack">
+              <div class="inline">
+                <label class="check-row">
+                  <input id="testSelectAllInput" type="checkbox" />
+                  <span>Select all</span>
+                </label>
+                <button id="runEndpointTestingBtn" type="button">Start Automated Testing</button>
+              </div>
+              <div id="endpointTestingStatus" class="helper-text"></div>
+              <button id="addDiscoveredRoutesBtn" type="button">Add Discovered Endpoints To Routes</button>
+              <div id="testEndpointsList" class="endpoint-list"></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="page" data-page="proxy">
+          <section class="panel-card page-card">
+            <h3>Proxy Traffic</h3>
+            <div class="stack">
+              <div class="proxy-tabbar">
+                <button id="proxyHttpTabBtn" type="button" class="proxy-tab is-active">HTTP</button>
+                <button id="proxyWebSocketTabBtn" type="button" class="proxy-tab">WebSocket</button>
+                <button id="clearProxyTrafficBtn" type="button">Clear Traffic</button>
+              </div>
+              <div class="helper-text">Proxy Mode: Enabled</div>
+              <div id="proxyTrafficStatus" class="helper-text"></div>
+              <div class="proxy-main-grid">
+                <section class="proxy-list-pane">
+                  <div class="proxy-table-head">
+                    <span>Date / Time</span>
+                    <span>Method</span>
+                    <span>URL</span>
+                    <span>Path</span>
+                    <span class="proxy-col-center">Param</span>
+                    <span class="proxy-col-center">Status</span>
+                    <span class="proxy-col-center">Response Time</span>
+                  </div>
+                  <div id="proxyTrafficList" class="proxy-table-list"></div>
+                </section>
+                <section class="proxy-detail-pane">
+                  <div id="proxyDetailGrid" class="proxy-detail-grid">
+                    <section id="proxyRequestCol" class="proxy-detail-col">
+                      <h4>Request</h4>
+                      <pre id="proxyRequestBody"></pre>
+                    </section>
+                    <section id="proxyResponseCol" class="proxy-detail-col">
+                      <h4>Response</h4>
+                      <pre id="proxyResponseBody"></pre>
+                    </section>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section class="page" data-page="test-results">
+          <section class="panel-card page-card">
+            <h3>Test Results</h3>
+            <div class="stack">
+              <div class="helper-text">Automated test outcomes for discovered endpoints.</div>
+              <div id="testResultsList" class="endpoint-list"></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="page" data-page="request-headers">
+          <section class="panel-card page-card">
+            <h3>Request Header Configuration</h3>
+            <div class="stack">
+              <div class="helper-text">
+                AI-style suggestions are prefilled per endpoint. Review and edit headers before running tests.
+              </div>
+              <div id="requestHeadersStatus" class="helper-text"></div>
+              <div id="requestHeadersList" class="endpoint-list"></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="page" data-page="manage-endpoints">
+          <section class="panel-card page-card">
+            <h3>Manage Endpoints</h3>
+            <div class="stack">
+              <input id="manageEndpointUrlInput" type="url" placeholder="https://api.example.com/v1/items" />
+              <select id="manageEndpointMethodInput">
+                <option>GET</option>
+                <option>POST</option>
+                <option>PUT</option>
+                <option>PATCH</option>
+                <option>DELETE</option>
+                <option>HEAD</option>
+                <option>OPTIONS</option>
+              </select>
+              <input id="manageEndpointGroupInput" type="text" placeholder="Group (e.g. Authentication)" />
+              <input id="manageEndpointReasonInput" type="text" placeholder="Reason / notes (optional)" />
+              <div class="inline">
+                <button id="saveManagedEndpointBtn" type="button">Save Endpoint</button>
+                <button id="cancelManagedEndpointEditBtn" type="button">Cancel Edit</button>
+              </div>
+              <div class="inline">
+                <select id="manageGroupSelect"></select>
+                <input id="manageGroupNameInput" type="text" placeholder="Rename selected group" />
+                <button id="renameGroupBtn" type="button">Rename Group</button>
+              </div>
+              <div id="manageEndpointStatus" class="helper-text"></div>
+              <div id="manageEndpointsList" class="endpoint-list"></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="page" data-page="repeater">
+          <section class="panel-card page-card">
+            <h3>Repeater</h3>
+            <div class="stack">
+              <div id="repeaterTabs" class="repeater-tabs"></div>
+              <div id="repeaterEmptyState" class="helper-text">
+                No endpoint in repeater. Right-click an endpoint in Test Endpoints and choose Send to Repeater.
+              </div>
+              <div id="repeaterView" class="repeater-view hidden">
+                <div id="repeaterLayout" class="repeater-pane repeater-layout">
+                  <div class="repeater-row repeater-top-row">
+                    <select id="repeaterMethodInput">
+                      <option>GET</option>
+                      <option>POST</option>
+                      <option>PUT</option>
+                      <option>PATCH</option>
+                      <option>DELETE</option>
+                      <option>HEAD</option>
+                      <option>OPTIONS</option>
+                    </select>
+                    <input id="repeaterUrlInput" type="url" placeholder="https://api.example.com/items" />
+                    <button id="repeaterSendBtn" type="button">Send</button>
+                    <div id="repeaterFlowNav" class="repeater-flow-nav hidden">
+                      <button id="repeaterPrevFlowBtn" type="button" title="Previous Pair" aria-label="Previous Pair">&lt;</button>
+                      <button id="repeaterNextFlowBtn" type="button" title="Next Pair" aria-label="Next Pair">&gt;</button>
+                      <button id="repeaterLastFlowBtn" type="button" title="Jump To Final Pair" aria-label="Jump To Final Pair">&gt;|</button>
+                    </div>
+                  </div>
+
+                  <div id="repeaterRequestSection" class="repeater-row repeater-scroll-row repeater-request-row">
+                    <div class="repeater-row-head">
+                      <h4>Request</h4>
+                      <div class="repeater-request-tabs">
+                        <button id="repeaterRequestRawTabBtn" type="button" class="repeater-request-tab is-active">Raw</button>
+                        <button id="repeaterRequestHeadersTabBtn" type="button" class="repeater-request-tab">Headers</button>
+                        <button id="repeaterRequestBodyTabBtn" type="button" class="repeater-request-tab">Body</button>
+                      </div>
+                    </div>
+                    <div id="repeaterRequestRawPane" class="repeater-request-pane">
+                      <textarea id="repeaterRequestRawInput" rows="10"></textarea>
+                    </div>
+                    <div id="repeaterRequestHeadersPane" class="repeater-request-pane hidden">
+                      <div class="repeater-row-head">
+                        <button id="repeaterAddHeaderBtn" type="button" title="Add Header" aria-label="Add Header">+</button>
+                      </div>
+                      <div class="repeater-header-table-wrap">
+                        <table class="repeater-header-table">
+                          <thead>
+                            <tr>
+                              <th>Request Header</th>
+                              <th>Value</th>
+                              <th></th>
+                            </tr>
+                          </thead>
+                          <tbody id="repeaterHeadersTableBody"></tbody>
+                        </table>
+                      </div>
+                    </div>
+                    <div id="repeaterRequestBodyPane" class="repeater-request-pane hidden">
+                      <textarea id="repeaterBodyInput" rows="8"></textarea>
+                    </div>
+                  </div>
+
+                  <div id="repeaterSplitHandle" class="repeater-split-handle" aria-hidden="true"></div>
+
+                  <div id="repeaterResponseSection" class="repeater-row repeater-scroll-row">
+                    <h4>Response</h4>
+                    <pre id="repeaterResponseBody"></pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section class="page" data-page="secrets">
+          <section class="panel-card page-card">
+            <h3>Secrets</h3>
+            <div class="stack">
+              <div class="helper-text">Set secrets per domain. Matching secrets are auto-applied to requests.</div>
+              <div class="inline">
+                <input id="secretDomainInput" type="text" placeholder="Domain pattern (e.g. api.example.com or *.supabase.co)" />
+                <button id="useCurrentSiteDomainBtn" type="button">Use Current Site</button>
+              </div>
+              <div class="inline">
+                <input id="secretKeyInput" type="text" placeholder="Key (e.g. apikey, Authorization)" />
+                <input id="secretValueInput" type="password" placeholder="Value" />
+              </div>
+              <div class="inline">
+                <select id="secretPlacementInput">
+                  <option value="header">Header</option>
+                  <option value="query">Query Param</option>
+                </select>
+                <label class="check-row">
+                  <input id="secretEnabledInput" type="checkbox" checked />
+                  <span>Enabled</span>
+                </label>
+              </div>
+              <div class="inline">
+                <button id="saveSecretBtn" type="button">Add Secret</button>
+                <button id="cancelSecretEditBtn" type="button">Cancel Edit</button>
+              </div>
+              <div id="secretsStatus" class="helper-text"></div>
+              <div id="secretsList" class="endpoint-list"></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="page" data-page="routes">
+          <div class="routes-top">
+            <section class="panel-card">
+              <h3>New Group</h3>
+              <div class="inline">
+                <input id="groupNameInput" type="text" placeholder="Group name" />
+                <button id="addGroupBtn" type="button">Add</button>
+              </div>
+            </section>
+
+            <section class="panel-card">
+              <h3>New Route</h3>
+              <div class="stack">
+                <input id="routeNameInput" type="text" placeholder="Route name" />
+                <select id="routeMethodInput">
+                  <option>GET</option>
+                  <option>POST</option>
+                  <option>PUT</option>
+                  <option>PATCH</option>
+                  <option>DELETE</option>
+                  <option>HEAD</option>
+                  <option>OPTIONS</option>
+                </select>
+                <input id="routeUrlInput" type="url" placeholder="https://api.example.com/items" />
+                <select id="routeGroupSelect"></select>
+                <button id="addRouteBtn" type="button">Add Route</button>
+              </div>
+            </section>
+
+            <section class="panel-card tree-wrap">
+              <h3>Routes</h3>
+              <div id="routeTree" class="route-tree"></div>
+            </section>
+          </div>
+
+          <div class="tester-wrap">
+            <div id="emptyState" class="empty-state">Select a route to start testing.</div>
+            <div id="tester" class="tester hidden">
+              <div class="workspace-head">
+                <input id="selectedRouteName" type="text" />
+                <div class="inline">
+                  <button id="saveRouteBtn" type="button">Save</button>
+                  <button id="deleteRouteBtn" type="button">Delete</button>
+                </div>
+              </div>
+              <div class="grid">
+                <label>
+                  Method
+                  <select id="selectedRouteMethod">
+                    <option>GET</option>
+                    <option>POST</option>
+                    <option>PUT</option>
+                    <option>PATCH</option>
+                    <option>DELETE</option>
+                    <option>HEAD</option>
+                    <option>OPTIONS</option>
+                  </select>
+                </label>
+                <label>
+                  Group
+                  <select id="selectedRouteGroup"></select>
+                </label>
+              </div>
+              <label>
+                URL
+                <input id="selectedRouteUrl" type="url" placeholder="https://api.example.com/items" />
+              </label>
+              <label>
+                Headers (JSON or key:value per line)
+                <textarea id="selectedRouteHeaders" rows="5" placeholder="{&quot;Authorization&quot;: &quot;Bearer ...&quot;}"></textarea>
+              </label>
+              <label>
+                Body
+                <textarea id="selectedRouteBody" rows="8" placeholder="{&quot;name&quot;: &quot;Sample&quot;}"></textarea>
+              </label>
+              <div class="inline">
+                <button id="sendRequestBtn" type="button">Send Request</button>
+                <span id="responseMeta"></span>
+              </div>
+              <div class="response-wrap">
+                <h4>Response Headers</h4>
+                <pre id="responseHeaders"></pre>
+                <h4>Response Body</h4>
+                <pre id="responseBody"></pre>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="page" data-page="swagger">
+          <section class="panel-card page-card">
+            <h3>Import Swagger/OpenAPI</h3>
+            <div class="stack">
+              <input id="swaggerUrlInput" type="url" placeholder="https://api.example.com/openapi.json" />
+              <button id="importSwaggerUrlBtn" type="button">Import from URL</button>
+              <textarea id="swaggerSpecInput" rows="10" placeholder="Paste OpenAPI/Swagger JSON or YAML"></textarea>
+              <button id="importSwaggerTextBtn" type="button">Import from Text</button>
+              <div id="importStatus" class="helper-text"></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="page" data-page="settings">
+          <section class="panel-card page-card">
+            <h3>Appearance</h3>
+            <div class="inline">
+              <button id="themeToggle" type="button" aria-label="Switch to dark mode" title="Switch to dark mode">
+                <span id="themeIcon" aria-hidden="true">&#128161;</span>
+              </button>
+              <span id="themeModeText" class="helper-text">Theme: Light</span>
+            </div>
+          </section>
+
+          <section class="panel-card page-card">
+            <h3>AI Settings</h3>
+            <div class="stack">
+              <select id="aiProviderSelect">
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="groq">Groq</option>
+                <option value="custom">Custom (OpenAI-compatible)</option>
+              </select>
+              <input id="aiEndpointInput" type="url" placeholder="LLM endpoint (OpenAI-compatible)" />
+              <input id="aiModelInput" type="text" placeholder="Model (e.g. gpt-4o-mini)" />
+              <input id="aiApiKeyInput" type="password" placeholder="LLM API key" />
+              <label class="check-row">
+                <input id="aiRememberKeyInput" type="checkbox" />
+                <span>Remember key for this browser session only</span>
+              </label>
+              <label class="check-row">
+                <input id="aiOneTimeKeyInput" type="checkbox" />
+                <span>One-time key mode (clear key after each AI request)</span>
+              </label>
+              <label>
+                Auto-clear key after inactivity (minutes)
+                <input id="aiAutoClearMinutesInput" type="number" min="1" step="1" value="15" />
+              </label>
+              <label class="check-row">
+                <input id="aiAllowUnsafeEndpointInput" type="checkbox" />
+                <span>Allow custom/unlisted endpoint (unsafe)</span>
+              </label>
+              <div class="helper-text">HTTPS-only endpoints are enforced.</div>
+              <button id="clearAiKeyBtn" type="button">Clear API Key</button>
+              <label class="check-row">
+                <input id="aiPrivacyModeInput" type="checkbox" checked />
+                <span>Privacy mode (redact secrets before sending to AI)</span>
+              </label>
+              <label class="check-row">
+                <input id="aiAllowSensitiveInput" type="checkbox" />
+                <span>Allow sending request headers/body to AI</span>
+              </label>
+              <button id="saveAiSettingsBtn" type="button">Save AI Settings</button>
+            </div>
+          </section>
+        </section>
+
+        <section class="page" data-page="ai-workflow">
+          <section class="panel-card page-card">
+            <h3>AI Workflow</h3>
+            <div class="stack">
+              <textarea id="aiPromptInput" rows="6" placeholder="Describe the workflow to automate"></textarea>
+              <div class="inline">
+                <button id="planAiWorkflowBtn" type="button">Generate Workflow</button>
+                <button id="runAiWorkflowBtn" type="button">Run Workflow</button>
+              </div>
+              <div id="aiStatus" class="helper-text"></div>
+              <pre id="aiWorkflowPreview" class="compact-pre"></pre>
+            </div>
+          </section>
+        </section>
+      </section>
     </main>
+
+    <div id="confirmModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
+      <div class="modal-card">
+        <h3 id="confirmModalTitle">Confirm</h3>
+        <p id="confirmModalMessage" class="helper-text"></p>
+        <div class="inline">
+          <button id="confirmModalCancelBtn" type="button">Cancel</button>
+          <button id="confirmModalConfirmBtn" type="button">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="endpointContextMenu" class="context-menu hidden">
+      <button id="sendToRepeaterMenuItem" type="button">Send to Repeater</button>
+    </div>
+
     <script type="module" src="./src/devtools/panel.ts"></script>
   </body>
 </html>
