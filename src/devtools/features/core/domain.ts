@@ -109,6 +109,19 @@ export interface EndpointTestResult {
   elapsedMs?: number;
   summary: string;
   error?: string;
+  securityOverview?: string;
+  securityFindings?: SecurityFinding[];
+  requestHeaders?: Record<string, string>;
+  requestBody?: string;
+  responseHeaders?: Record<string, string>;
+  responseBodySnippet?: string;
+}
+
+export interface SecurityFinding {
+  title: string;
+  severity: "low" | "medium" | "high";
+  evidence: string;
+  recommendation: string;
 }
 
 export interface WorkspaceItem {

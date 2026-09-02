@@ -12,7 +12,7 @@
       <div class="toolbar-actions">
         <select id="workspaceSelect" title="Active workspace"></select>
         <button id="saveWorkspaceBtn" type="button" title="Save active workspace">Save</button>
-        <button id="devRefreshBtn" type="button" title="Reload inspected page and extension">
+        <button id="devRefreshBtn" type="button" title="Reload inspected page and extension" data-dev-only="true">
           Dev Refresh
         </button>
       </div>
@@ -161,6 +161,7 @@
               <div class="proxy-tabbar">
                 <button id="proxyHttpTabBtn" type="button" class="proxy-tab is-active">HTTP</button>
                 <button id="proxyWebSocketTabBtn" type="button" class="proxy-tab">WebSocket</button>
+                <button id="startProxyAutomatedTestingBtn" type="button">Start Automated Testing</button>
                 <button id="clearProxyTrafficBtn" type="button">Clear Traffic</button>
               </div>
               <div class="helper-text">Proxy Mode: Enabled</div>
@@ -236,16 +237,17 @@
               <input id="manageEndpointGroupInput" type="text" placeholder="Group (e.g. Authentication)" />
               <input id="manageEndpointReasonInput" type="text" placeholder="Reason / notes (optional)" />
               <div class="inline">
-                <button id="saveManagedEndpointBtn" type="button">Save Endpoint</button>
-                <button id="cancelManagedEndpointEditBtn" type="button">Cancel Edit</button>
-              </div>
-              <div class="inline">
-                <select id="manageGroupSelect"></select>
-                <input id="manageGroupNameInput" type="text" placeholder="Rename selected group" />
-                <button id="renameGroupBtn" type="button">Rename Group</button>
+                <button id="saveManagedEndpointBtn" type="button">Add Endpoint</button>
               </div>
               <div id="manageEndpointStatus" class="helper-text"></div>
               <div id="manageEndpointsList" class="endpoint-list"></div>
+              <div class="workspace-clear-section">
+                <div class="inline">
+                  <select id="manageGroupSelect"></select>
+                  <input id="manageGroupNameInput" type="text" placeholder="Rename selected group" />
+                  <button id="renameGroupBtn" type="button">Rename Group</button>
+                </div>
+              </div>
             </div>
           </section>
         </section>
@@ -549,14 +551,64 @@
         <h3 id="confirmModalTitle">Confirm</h3>
         <p id="confirmModalMessage" class="helper-text"></p>
         <div class="inline">
-          <button id="confirmModalCancelBtn" type="button">Cancel</button>
           <button id="confirmModalConfirmBtn" type="button">Confirm</button>
+          <button id="confirmModalCancelBtn" type="button">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="securityResultModal"
+      class="modal hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="securityResultModalTitle"
+    >
+      <div class="modal-card security-modal-card">
+        <h3 id="securityResultModalTitle">Endpoint Security Analysis</h3>
+        <div id="securityResultModalEndpoint" class="helper-text"></div>
+        <div id="securityResultModalSummary" class="helper-text"></div>
+        <div id="securityResultModalOverview" class="helper-text"></div>
+        <div id="securityResultModalFindings" class="endpoint-list"></div>
+        <div class="inline">
+          <button id="securityResultCloseBtn" type="button">Close</button>
         </div>
       </div>
     </div>
 
     <div id="endpointContextMenu" class="context-menu hidden">
       <button id="sendToRepeaterMenuItem" type="button">Send to Repeater</button>
+    </div>
+
+    <div
+      id="manageEndpointEditModal"
+      class="modal hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="manageEndpointEditModalTitle"
+    >
+      <div class="modal-card">
+        <h3 id="manageEndpointEditModalTitle">Edit Endpoint</h3>
+        <div class="stack">
+          <input id="editEndpointUrlInput" type="url" placeholder="https://api.example.com/v1/items" />
+          <select id="editEndpointMethodInput">
+            <option>GET</option>
+            <option>POST</option>
+            <option>PUT</option>
+            <option>PATCH</option>
+            <option>DELETE</option>
+            <option>HEAD</option>
+            <option>OPTIONS</option>
+          </select>
+          <input id="editEndpointGroupInput" type="text" placeholder="Group (e.g. Authentication)" />
+          <input id="editEndpointReasonInput" type="text" placeholder="Reason / notes (optional)" />
+          <div id="editEndpointStatus" class="helper-text"></div>
+          <div class="inline">
+            <button id="saveEditEndpointBtn" type="button">Save Changes</button>
+            <button id="cancelEditEndpointBtn" type="button">Cancel</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script type="module" src="./panel.ts"></script>
