@@ -168,11 +168,18 @@ const manageEndpointMethodInput = document.querySelector<HTMLSelectElement>("#ma
 const manageEndpointGroupInput = document.querySelector<HTMLInputElement>("#manageEndpointGroupInput");
 const manageEndpointReasonInput = document.querySelector<HTMLInputElement>("#manageEndpointReasonInput");
 const saveManagedEndpointBtn = document.querySelector<HTMLButtonElement>("#saveManagedEndpointBtn");
-const cancelManagedEndpointEditBtn = document.querySelector<HTMLButtonElement>("#cancelManagedEndpointEditBtn");
 const manageGroupSelect = document.querySelector<HTMLSelectElement>("#manageGroupSelect");
 const manageGroupNameInput = document.querySelector<HTMLInputElement>("#manageGroupNameInput");
 const renameGroupBtn = document.querySelector<HTMLButtonElement>("#renameGroupBtn");
 const manageEndpointStatus = document.querySelector<HTMLDivElement>("#manageEndpointStatus");
+let manageEndpointEditModal = document.querySelector<HTMLDivElement>("#manageEndpointEditModal");
+let editEndpointUrlInput = document.querySelector<HTMLInputElement>("#editEndpointUrlInput");
+let editEndpointMethodInput = document.querySelector<HTMLSelectElement>("#editEndpointMethodInput");
+let editEndpointGroupInput = document.querySelector<HTMLInputElement>("#editEndpointGroupInput");
+let editEndpointReasonInput = document.querySelector<HTMLInputElement>("#editEndpointReasonInput");
+let editEndpointStatus = document.querySelector<HTMLDivElement>("#editEndpointStatus");
+let saveEditEndpointBtn = document.querySelector<HTMLButtonElement>("#saveEditEndpointBtn");
+let cancelEditEndpointBtn = document.querySelector<HTMLButtonElement>("#cancelEditEndpointBtn");
 const aiProviderSelect = document.querySelector<HTMLSelectElement>("#aiProviderSelect");
 const aiEndpointInput = document.querySelector<HTMLInputElement>("#aiEndpointInput");
 const aiModelInput = document.querySelector<HTMLInputElement>("#aiModelInput");
@@ -268,12 +275,75 @@ const ensureSecurityResultModalMarkup = () => {
 
 ensureSecurityResultModalMarkup();
 
+const ensureManageEndpointEditModalMarkup = () => {
+  if (
+    manageEndpointEditModal &&
+    editEndpointUrlInput &&
+    editEndpointMethodInput &&
+    editEndpointGroupInput &&
+    editEndpointReasonInput &&
+    editEndpointStatus &&
+    saveEditEndpointBtn &&
+    cancelEditEndpointBtn
+  ) {
+    return;
+  }
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = `
+    <div
+      id="manageEndpointEditModal"
+      class="modal hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="manageEndpointEditModalTitle"
+    >
+      <div class="modal-card">
+        <h3 id="manageEndpointEditModalTitle">Edit Endpoint</h3>
+        <div class="stack">
+          <input id="editEndpointUrlInput" type="url" placeholder="https://api.example.com/v1/items" />
+          <select id="editEndpointMethodInput">
+            <option>GET</option>
+            <option>POST</option>
+            <option>PUT</option>
+            <option>PATCH</option>
+            <option>DELETE</option>
+            <option>HEAD</option>
+            <option>OPTIONS</option>
+          </select>
+          <input id="editEndpointGroupInput" type="text" placeholder="Group (e.g. Authentication)" />
+          <input id="editEndpointReasonInput" type="text" placeholder="Reason / notes (optional)" />
+          <div id="editEndpointStatus" class="helper-text"></div>
+          <div class="inline">
+            <button id="saveEditEndpointBtn" type="button">Save Changes</button>
+            <button id="cancelEditEndpointBtn" type="button">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  const modal = wrapper.firstElementChild;
+  if (modal) {
+    document.body.appendChild(modal);
+  }
+  manageEndpointEditModal = document.querySelector<HTMLDivElement>("#manageEndpointEditModal");
+  editEndpointUrlInput = document.querySelector<HTMLInputElement>("#editEndpointUrlInput");
+  editEndpointMethodInput = document.querySelector<HTMLSelectElement>("#editEndpointMethodInput");
+  editEndpointGroupInput = document.querySelector<HTMLInputElement>("#editEndpointGroupInput");
+  editEndpointReasonInput = document.querySelector<HTMLInputElement>("#editEndpointReasonInput");
+  editEndpointStatus = document.querySelector<HTMLDivElement>("#editEndpointStatus");
+  saveEditEndpointBtn = document.querySelector<HTMLButtonElement>("#saveEditEndpointBtn");
+  cancelEditEndpointBtn = document.querySelector<HTMLButtonElement>("#cancelEditEndpointBtn");
+};
+
+ensureManageEndpointEditModalMarkup();
+
 const themeToggleEl = document.querySelector<HTMLButtonElement>("#themeToggle");
 const themeIconEl = document.querySelector<HTMLSpanElement>("#themeIcon");
 const themeModeText = document.querySelector<HTMLSpanElement>("#themeModeText");
 const devRefreshBtn = document.querySelector<HTMLButtonElement>("#devRefreshBtn");
 const navItems = Array.from(document.querySelectorAll<HTMLButtonElement>(".nav-item"));
 const pages = Array.from(document.querySelectorAll<HTMLElement>(".page"));
+const DEV_REFRESH_ENABLED = import.meta.env.MODE !== "production";
 
 if (
   !groupNameInput ||
@@ -373,11 +443,18 @@ if (
   !manageEndpointGroupInput ||
   !manageEndpointReasonInput ||
   !saveManagedEndpointBtn ||
-  !cancelManagedEndpointEditBtn ||
   !manageGroupSelect ||
   !manageGroupNameInput ||
   !renameGroupBtn ||
   !manageEndpointStatus ||
+  !manageEndpointEditModal ||
+  !editEndpointUrlInput ||
+  !editEndpointMethodInput ||
+  !editEndpointGroupInput ||
+  !editEndpointReasonInput ||
+  !editEndpointStatus ||
+  !saveEditEndpointBtn ||
+  !cancelEditEndpointBtn ||
   !aiProviderSelect ||
   !aiEndpointInput ||
   !aiModelInput ||
@@ -416,7 +493,7 @@ if (
   !confirmModalCancelBtn ||
   !endpointContextMenu ||
   !sendToRepeaterMenuItem ||
-  !devRefreshBtn ||
+  (DEV_REFRESH_ENABLED && !devRefreshBtn) ||
   !themeToggleEl ||
   !themeIconEl ||
   navItems.length === 0 ||
@@ -446,7 +523,7 @@ let currentWorkflow: WorkflowPlan | null = null;
 let aiApiKeyMemory = "";
 let keyAutoClearTimer: number | null = null;
 let discoveredEndpoints: DiscoveredEndpoint[] = readDiscoveredEndpoints();
-let editingDiscoveredEndpointId: string | null = null;
+let editingManagedEndpointId: string | null = null;
 let devRefreshInProgress = false;
 let discoveryInProgress = false;
 let awaitingManualAuthStep = false;
@@ -1111,7 +1188,8 @@ const loadWorkspaceIntoPanel = (workspaceId: string) => {
   siteMaxPagesInput.value = String(setup.siteMaxPages || 6);
   passiveDiscoveryEnabledInput.checked = setup.passiveDiscoveryEnabled;
   proxyDiscoveryEnabledInput.checked = setup.proxyDiscoveryEnabled;
-  editingDiscoveredEndpointId = null;
+  editingManagedEndpointId = null;
+  hideManageEndpointEditModal();
   currentWorkflow = null;
   aiWorkflowPreview.textContent = "";
   repeaterEntries = [];
@@ -2218,11 +2296,26 @@ const renderRequestHeadersList = () => {
 };
 
 const resetManagedEndpointForm = () => {
-  editingDiscoveredEndpointId = null;
   manageEndpointUrlInput.value = "";
   manageEndpointMethodInput.value = "GET";
   manageEndpointGroupInput.value = "General";
   manageEndpointReasonInput.value = "";
+};
+
+const hideManageEndpointEditModal = () => {
+  manageEndpointEditModal.classList.add("hidden");
+  editingManagedEndpointId = null;
+  editEndpointStatus.textContent = "";
+};
+
+const openManageEndpointEditModal = (endpoint: DiscoveredEndpoint) => {
+  editingManagedEndpointId = endpoint.id;
+  editEndpointUrlInput.value = endpoint.url;
+  editEndpointMethodInput.value = endpoint.method;
+  editEndpointGroupInput.value = endpoint.group;
+  editEndpointReasonInput.value = endpoint.reason ?? "";
+  editEndpointStatus.textContent = "";
+  manageEndpointEditModal.classList.remove("hidden");
 };
 
 const renderManageEndpointsList = () => {
@@ -3439,20 +3532,13 @@ manageEndpointsList.addEventListener("click", (event) => {
 
   if (button.dataset.endpointAction === "delete") {
     discoveredEndpoints = discoveredEndpoints.filter((item) => item.id !== endpointId);
-    if (editingDiscoveredEndpointId === endpointId) {
-      resetManagedEndpointForm();
-    }
+    if (editingManagedEndpointId === endpointId) hideManageEndpointEditModal();
     renderDiscoveredEndpoints();
     manageEndpointStatus.textContent = "Endpoint deleted.";
     return;
   }
 
-  editingDiscoveredEndpointId = endpoint.id;
-  manageEndpointUrlInput.value = endpoint.url;
-  manageEndpointMethodInput.value = endpoint.method;
-  manageEndpointGroupInput.value = endpoint.group;
-  manageEndpointReasonInput.value = endpoint.reason ?? "";
-  manageEndpointStatus.textContent = "Editing selected endpoint.";
+  openManageEndpointEditModal(endpoint);
 });
 
 saveManagedEndpointBtn.addEventListener("click", () => {
@@ -3466,30 +3552,47 @@ saveManagedEndpointBtn.addEventListener("click", () => {
   const group = normalizeDiscoveredGroup(manageEndpointGroupInput.value);
   const reason = manageEndpointReasonInput.value.trim();
 
-  if (editingDiscoveredEndpointId) {
-    discoveredEndpoints = discoveredEndpoints.map((endpoint) =>
-      endpoint.id === editingDiscoveredEndpointId ? { ...endpoint, url, method, group, reason } : endpoint
-    );
-    manageEndpointStatus.textContent = "Endpoint updated.";
-  } else {
-    discoveredEndpoints.push({
-      id: crypto.randomUUID(),
-      url,
-      method,
-      group,
-      reason,
-      confidence: undefined
-    });
-    manageEndpointStatus.textContent = "Endpoint added.";
-  }
+  discoveredEndpoints.push({
+    id: crypto.randomUUID(),
+    url,
+    method,
+    group,
+    reason,
+    confidence: undefined
+  });
+  manageEndpointStatus.textContent = "Endpoint added.";
 
   resetManagedEndpointForm();
   renderDiscoveredEndpoints();
 });
 
-cancelManagedEndpointEditBtn.addEventListener("click", () => {
-  resetManagedEndpointForm();
-  manageEndpointStatus.textContent = "Edit canceled.";
+saveEditEndpointBtn.addEventListener("click", () => {
+  if (!editingManagedEndpointId) return;
+  const url = editEndpointUrlInput.value.trim();
+  if (!url) {
+    editEndpointStatus.textContent = "Endpoint URL is required.";
+    return;
+  }
+  const methodCandidate = editEndpointMethodInput.value.toUpperCase() as HttpMethod;
+  const method = METHOD_SET.has(methodCandidate) ? methodCandidate : "GET";
+  const group = normalizeDiscoveredGroup(editEndpointGroupInput.value);
+  const reason = editEndpointReasonInput.value.trim();
+  discoveredEndpoints = discoveredEndpoints.map((endpoint) =>
+    endpoint.id === editingManagedEndpointId ? { ...endpoint, url, method, group, reason } : endpoint
+  );
+  hideManageEndpointEditModal();
+  renderDiscoveredEndpoints();
+  manageEndpointStatus.textContent = "Endpoint updated.";
+});
+
+cancelEditEndpointBtn.addEventListener("click", () => {
+  hideManageEndpointEditModal();
+});
+
+manageEndpointEditModal.addEventListener("click", (event) => {
+  if (event.target === manageEndpointEditModal) {
+    hideManageEndpointEditModal();
+  }
 });
 
 renameGroupBtn.addEventListener("click", () => {
@@ -4142,7 +4245,8 @@ clearWorkspaceBtn.addEventListener("click", async () => {
   proxyViewLimitByTab = { http: PROXY_TRAFFIC_PAGE_SIZE, websocket: PROXY_TRAFFIC_PAGE_SIZE };
   renderRepeater();
   renderProxyTraffic();
-  editingDiscoveredEndpointId = null;
+  editingManagedEndpointId = null;
+  hideManageEndpointEditModal();
   const setup = defaultWorkspaceSetup();
   siteBaseUrlInput.value = setup.siteBaseUrl;
   siteMaxPagesInput.value = String(setup.siteMaxPages);
@@ -4491,28 +4595,32 @@ themeToggleEl.addEventListener("click", () => {
   applyTheme(currentTheme);
 });
 
-devRefreshBtn.addEventListener("click", () => {
-  if (devRefreshInProgress) return;
-  devRefreshInProgress = true;
-  awaitingManualAuthStep = false;
-  continueAuthDiscoveryBtn.disabled = true;
-  cancelAuthSessionBtn.disabled = true;
-  stopAuthMonitoring();
-  authMonitoredCandidates.clear();
-  devRefreshBtn.disabled = true;
-  startSiteTestingBtn.disabled = true;
-  runAuthDiscoveryBtn.disabled = true;
-  siteStatus.textContent = "Refreshing inspected page and panel...";
-  chrome.devtools.inspectedWindow.reload({ ignoreCache: true });
-  window.setTimeout(() => {
-    window.location.reload();
-  }, 250);
-});
+if (DEV_REFRESH_ENABLED && devRefreshBtn) {
+  devRefreshBtn.addEventListener("click", () => {
+    if (devRefreshInProgress) return;
+    devRefreshInProgress = true;
+    awaitingManualAuthStep = false;
+    continueAuthDiscoveryBtn.disabled = true;
+    cancelAuthSessionBtn.disabled = true;
+    stopAuthMonitoring();
+    authMonitoredCandidates.clear();
+    devRefreshBtn.disabled = true;
+    startSiteTestingBtn.disabled = true;
+    runAuthDiscoveryBtn.disabled = true;
+    siteStatus.textContent = "Refreshing inspected page and panel...";
+    chrome.devtools.inspectedWindow.reload({ ignoreCache: true });
+    window.setTimeout(() => {
+      window.location.reload();
+    }, 250);
+  });
+}
 
 chrome.devtools.network.onNavigated.addListener(() => {
   if (!devRefreshInProgress) return;
   devRefreshInProgress = false;
-  devRefreshBtn.disabled = false;
+  if (devRefreshBtn) {
+    devRefreshBtn.disabled = false;
+  }
   startSiteTestingBtn.disabled = false;
   runAuthDiscoveryBtn.disabled = false;
   siteStatus.textContent = "Refresh done. Panel reloaded.";
