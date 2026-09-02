@@ -14,12 +14,17 @@
 - [Security And Privacy Notes](#security-and-privacy-notes)
 - [Contributing](#contributing)
 - [Contact](#contact)
+- [License](#license)
 
 ## About The Project
 
 TestX is a Chrome DevTools panel that helps developers inspect web applications, discover API endpoints, capture runtime traffic, and test requests from inside DevTools.
 
 The extension adds a custom `TestX` tab to Chrome DevTools. From that panel you can organize workspaces, discover endpoints from the inspected site, import OpenAPI/Swagger definitions, configure request headers and secrets, replay requests in a repeater, and run optional AI-assisted workflows.
+
+<p align="center">
+  <img src="screenshots/TestX-Screenshot.png" alt="TestX DevTools panel screenshot" />
+</p>
 
 ## Features
 
@@ -124,3 +129,7 @@ Contributions are welcome.
 </p>
 
 Project Link: [https://github.com/santhossunthar/TextX](https://github.com/santhossunthar/TextX)
+
+## License
+
+Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
